@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var exportWindow = window.__adobe_cep__ ? /^com\.frameshelf\.ae\.export(panel)?$/.test(window.__adobe_cep__.getExtensionId()) : new URLSearchParams(location.search).get('window') === 'export';
+  var exportWindow = window.__adobe_cep__ ? window.__adobe_cep__.getExtensionId() === 'com.frameshelf.ae.exportpanel' : new URLSearchParams(location.search).get('window') === 'export';
   document.body.classList.add(exportWindow ? 'export-window' : 'capture-window');
   var popup = null;
   var C = window.FrameShelfCore, B = window.FrameShelfBridge, S = window.FrameShelfStorage;
@@ -9,30 +9,6 @@
   var inputGate = window.FrameShelfTextInput.createGate(document);
   function bindText(input, save) { inputGate.bind(input, function () { try { save(); } catch (e) { notice(e.message, true); } }); }
   function button(text, fn) { var b = node('button', text, 'quiet'); b.type = 'button'; b.onclick = guard(fn); return b; }
-  var inputTrace = null, traceTimer;
-  function traceInput(event) {
-    if (!inputTrace || !/^(INPUT|TEXTAREA)$/.test(event.target.tagName)) return;
-    var target = event.target;
-    inputTrace.events.push({ at: Date.now(), event: event.type, field: target.getAttribute('aria-label') || target.id || target.type,
-      length: target.value.length, chinese: /[\u3400-\u9fff]/.test(target.value), dataLength: (event.data || '').length,
-      dataChinese: /[\u3400-\u9fff]/.test(event.data || ''), composing: !!event.isComposing, inputType: event.inputType || '',
-      connected: target.isConnected, disabled: target.disabled });
-    inputTrace.events = inputTrace.events.slice(-250);
-    clearTimeout(traceTimer); traceTimer = setTimeout(function () { try { S.write('ime-diagnostic', inputTrace); } catch (_) {} }, 250);
-  }
-  ['compositionstart','compositionupdate','compositionend','beforeinput','input','change','focusin','focusout'].forEach(function (name) { document.addEventListener(name, traceInput, true); });
-  function inputDiagnostic() {
-    inputTrace = { version: '0.8.7', extension: window.__adobe_cep__ ? window.__adobe_cep__.getExtensionId() : 'browser', started: Date.now(), userAgent: navigator.userAgent, events: [] };
-    var box = node('div');
-    box.append(node('p', '请分别输入并选字。这里只检查输入，不修改产品名，也不记录文字内容。'));
-    [['input','原始输入框（无字段逻辑）'],['input','明确 text 类型'],['textarea','多行输入框']].forEach(function (spec,index) {
-      var label = node('label',spec[1]), input = node(spec[0]);
-      if(index===1) input.type='text';
-      input.setAttribute('aria-label','诊断 '+spec[1]);label.append(input);box.append(label);
-    });
-    box.className='new-field-form';
-    modal('中文输入对照诊断', box, '保存诊断', function () { S.write('ime-diagnostic',inputTrace); notice('诊断已保存。现在可在产品名里再输入一次，事件会继续记录到关闭窗口。'); });
-  }
   var noticeTimer;
   function notice(text, error) { clearTimeout(noticeTimer); if (text && !error) noticeTimer = setTimeout(function () { $('notice').hidden = true; }, 4500); $('notice').hidden = !text; $('notice').textContent = text || ''; $('notice').className = error ? 'warning' : ''; }
   function guard(fn) { return async function (event) { if (busy) return; lock(true); try { await fn(event); } catch (e) { notice(e.message, true); checkRecovery(); } finally { lock(false); } }; }
@@ -44,7 +20,7 @@
   function persist() { return S.withStateLock ? S.withStateLock(persistUnlocked) : persistUnlocked(); }
   function openExport() {
     if (exportWindow) { page('board'); return; }
-    if (window.__adobe_cep__) window.__adobe_cep__.requestOpenExtension('com.frameshelf.ae.export', '');
+    if (window.__adobe_cep__) window.__adobe_cep__.requestOpenExtension('com.frameshelf.ae.exportpanel', '');
     else { popup = window.open('index.html?window=export', 'frameshelf-export', 'width=1280,height=800,resizable=yes'); if (!popup) throw new Error('浏览器拦截了弹出窗口，请允许此页面打开窗口。'); popup.focus(); }
   }
   function lock(value) { busy = value; document.body.classList.toggle('busy', value); document.querySelectorAll('button,input,select').forEach(function (n) { if (n.id !== 'stop-button') n.disabled = value; }); $('progress-track').hidden = !value; }
@@ -262,14 +238,6 @@
   }
   if (exportWindow) {
     $('board-tools').append(document.querySelector('.naming'));
-    document.querySelector('.toolbar').append(button('输入诊断', inputDiagnostic));
-    if (window.__adobe_cep__ && window.__adobe_cep__.getExtensionId() === 'com.frameshelf.ae.export') {
-      document.querySelector('.toolbar').append(button('兼容面板', function () {
-        persist();
-        window.__adobe_cep__.requestOpenExtension('com.frameshelf.ae.exportpanel', '');
-        window.__adobe_cep__.closeExtension();
-      }));
-    }
     document.querySelector('.toolbar').append(document.querySelector('.tabs'), $('close-board'));
     document.querySelector('.tabs [data-page=workspace]').firstChild.textContent = '命名导出 ';
     document.querySelector('#output-heading').append($('assignment-count'));

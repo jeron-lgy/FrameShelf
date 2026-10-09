@@ -101,3 +101,8 @@ AE 25.2 本机 OutputModule reflect 方法探测未发现原生设置对话框�
 用户完成三个无业务绑定控件和产品名的输入尝试。日志共 10 条，全部 focusin/focusout；无 composition / beforeinput / input / change。三个空控件长度一直为 0；产品字段保持原有 3 个汉字。事件时控件 connected=true、disabled=false。运行时 AdobeCEP/12.0.1、Chrome/99.0.4844.84。这组记录不支持字段保存覆盖输入的假设，定位范围转向宿主输入事件投递；不能仅凭这些日志断定具体 CEP 缺陷。
 
 0.8.7 增加相同页面的 Panel 类型入口，保留原 Modeless 入口。等待真实 IME 选字验证，未宣称兼容面板已解决问题。
+
+
+## 0.8.8 单入口整理
+
+用户确认 0.8.7 的 Panel 类型命名窗口中中文输入正常。证据支持采用 Panel 类型，不能据此断定 AE/CEP 内部具体故障实现。0.8.8 保留相同已验证的窗口 ID、页面和 Panel 类型，移除原 Modeless 声明，命名面板省略 Menu 标签，仅经 requestOpenExtension 打开。删除诊断监听和按钮。结构检查确认一个 Menu、两个 Panel、内部打开目标匹配；更新后的 AE 菜单尚需重启后确认。
