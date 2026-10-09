@@ -81,7 +81,7 @@ var FrameShelf = (function () {
         idle(); var comps = [], seen = {}, queue = [], i;
         for (i = 0; i < args.records.length; i++) {
             var c = checkedComp(args.records[i]);
-            if (!seen["id" + c.id]) { comps.push({ compId: c.id, layers: layerStates(c), workAreaStart: c.workAreaStart, workAreaDuration: c.workAreaDuration }); seen["id" + c.id] = true; }
+            if (!seen["id" + c.id]) { comps.push({ compId: c.id, layers: layerStates(c), resolutionFactor: c.resolutionFactor, workAreaStart: c.workAreaStart, workAreaDuration: c.workAreaDuration }); seen["id" + c.id] = true; }
         }
         for (i = 1; i <= app.project.renderQueue.numItems; i++) {
             var q = app.project.renderQueue.item(i);
@@ -131,7 +131,7 @@ var FrameShelf = (function () {
             var q = saved.queue[i];
             if (q.index > app.project.renderQueue.numItems || queueSignature(app.project.renderQueue.item(q.index)) !== q.signature) { throw new Error("原队列已被修改，无法自动恢复；请在 AE 中检查勾选状态。"); }
         }
-        for (i = 0; i < saved.comps.length; i++) { restoreLayers(compById(saved.comps[i].compId), saved.comps[i].layers, errors); restoreArea(compById(saved.comps[i].compId), { start: saved.comps[i].workAreaStart, duration: saved.comps[i].workAreaDuration }, errors); }
+        for (i = 0; i < saved.comps.length; i++) { restoreLayers(compById(saved.comps[i].compId), saved.comps[i].layers, errors); if(saved.comps[i].resolutionFactor) { try { compById(saved.comps[i].compId).resolutionFactor = saved.comps[i].resolutionFactor; } catch(resError) { errors.push("预览分辨率恢复失败"); } } restoreArea(compById(saved.comps[i].compId), { start: saved.comps[i].workAreaStart, duration: saved.comps[i].workAreaDuration }, errors); }
         for (i = 0; i < saved.queue.length; i++) { try { app.project.renderQueue.item(saved.queue[i].index).render = true; } catch (e) { errors.push(String(e)); } }
         if (errors.length) { throw new Error(errors.join("；")); }
         return true;
@@ -203,6 +203,25 @@ var FrameShelf = (function () {
         if (images.length !== 1 || images[0].length === 0) { throw new Error("单帧任务输出数量异常：" + images.length + " 张；范围 " + item.timeSpanStart + " / " + item.timeSpanDuration + " 秒；目录 " + args.directory); }
         return { path: images[0].fsName, profile: configured.profile, factor: configured.factor, width: comp.width, height: comp.height };
     }
+    function directPreview(args) {
+        permission(); var c = checkedComp(args.record), saved = layerStates(c), resolution = c.resolutionFactor;
+        var file = new File(args.directory + "/preview.png"), error = null, errors = [];
+        if (!(new Folder(args.directory)).exists) { throw new Error("预览临时目录不存在。"); }
+        try {
+            apply(c, args.record.layers);
+            var factor = Math.max(1, Math.ceil(Math.max(c.width, c.height) / 960));
+            c.resolutionFactor = [factor, factor];
+            c.saveFrameToPng(args.record.frameIndex * c.frameDuration, file);
+            // AE may finish writing after this script returns; Node waits for a complete PNG.
+        } catch (e) { error = e; }
+        finally {
+            restoreLayers(c, saved, errors);
+            try { c.resolutionFactor = resolution; } catch (e2) { errors.push("预览分辨率恢复失败：" + e2.message); }
+        }
+        if (errors.length) { var failure = new Error(errors.join("；")); failure.needsRecovery = true; throw failure; }
+        if (error) { throw error; }
+        return { path: file.fsName };
+    }
     function render(args) {
         permission(); var c = checkedComp(args.record);
         args.frameIndex = args.record.frameIndex;
@@ -221,7 +240,7 @@ var FrameShelf = (function () {
             });
         });
     }
-    var methods = { info: info, capture: capture, profiles: profiles, snapshot: snapshot, recover: recover, render: render, probe: probe,
+    var methods = { info: info, capture: capture, profiles: profiles, snapshot: snapshot, recover: recover, render: render, directPreview: directPreview, probe: probe,
         validate: function (args) { for (var i = 0; i < args.records.length; i++) { checkedComp(args.records[i]); } return info(); },
         chooseFolder: function () { var f = Folder.selectDialog("选择批量导出文件夹"); return f ? f.fsName : null; },
         openFolder: function (args) { var f = new Folder(args.path); if (!f.exists) { throw new Error("文件夹不存在。"); } return f.execute(); },

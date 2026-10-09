@@ -36,3 +36,12 @@ test('AE unspecified fourth channel gets template-specified alpha tag only',t=>{
  const out=fs.readFileSync(file);for(let i=0;i<bytes.length;i++)if(i!==offset)assert.equal(out[i],bytes[i]);assert.equal(I.verify(file,{kind:'TIFF',bits:8,alpha:true}).premultiplied,true);
  assert.equal(I.normalizeTiffAlpha(file,{kind:'TIFF',alpha:true,color:'Premultiplied (Matted)'}),false);
 });
+
+test('Preview waits for delayed complete PNG and times out incomplete writes',async t=>{
+ const s=createStore(root(t)),stage=s.stage(),f=path.join(stage.directory,'preview.png');
+ const writing=setTimeout(()=>fs.writeFileSync(f,png().subarray(0,40)),20);
+ const complete=setTimeout(()=>fs.writeFileSync(f,png()),220);
+ t.after(()=>{clearTimeout(writing);clearTimeout(complete);});
+ await s.waitPreview(stage,f,2000);assert.equal(I.inspect(f).kind,'PNG');
+ fs.writeFileSync(f,png().subarray(0,40));await assert.rejects(s.waitPreview(stage,f,200),/超时/);
+});

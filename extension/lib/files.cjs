@@ -95,6 +95,24 @@ function createStore(root) {
       return Object.assign({}, job, { filename });
     });
   }
+  async function waitPreview(job, source, timeoutMs = 60000) {
+    assertStage(job);
+    if (path.dirname(path.resolve(source)) !== path.resolve(job.directory)) throw new Error('预览文件不在本次临时目录内。');
+    const deadline = Date.now() + timeoutMs;
+    let previous = '';
+    while (Date.now() < deadline) {
+      try {
+        assertStage(job, source);
+        const info = images.inspect(source), stat = fs.statSync(source);
+        if (info.kind !== 'PNG') throw new Error('预览不是 PNG。');
+        const stamp = stat.size + ':' + stat.mtimeMs;
+        if (stamp === previous) return;
+        previous = stamp;
+      } catch (_) { previous = ''; }
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+    throw new Error('等待 AE 预览文件超时；组合已保留，可稍后重试预览。');
+  }
   function savePreview(job, source, recordId) {
     assertStage(job, source);
     const info = images.inspect(source);
@@ -109,7 +127,7 @@ function createStore(root) {
     if (path.dirname(real) !== previewRoot || fs.statSync(real).size > 16 * 1024 * 1024) return '';
     return 'data:image/png;base64,' + fs.readFileSync(real).toString('base64');
   }
-  return { root, native: true, read, write, stage, cleanup, publish, availableNames, savePreview, imageUrl, verify: images.verify,
+  return { root, native: true, read, write, stage, cleanup, publish, availableNames, waitPreview, savePreview, imageUrl, verify: images.verify,
     normalizeOutput: (job, file, profile) => { assertStage(job, file); return images.normalizeTiffAlpha(file, profile); },
     withStateLock, acquireJob: () => acquireLock('render'), jobActive: () => activeLock('render') };
 }

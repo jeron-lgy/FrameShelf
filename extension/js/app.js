@@ -165,10 +165,9 @@
     if (S.jobActive && S.jobActive()) throw new Error('另一个窗口正在渲染，请等待完成后刷新合成。');
     adoptInfo(await B.call('info'));
   }
-  function previewTemplate() { var p = profiles.find(function (p) { return p.kind === 'PNG' && p.bits === 8 && p.hidden; }) || profiles.find(function (p) { return p.kind === 'PNG' && p.bits === 8; }); return p ? p.name : ''; }
   async function reload() { if (S.jobActive && S.jobActive()) { profiles = S.read('profiles', []); render(); return; } profiles = await B.call('profiles'); S.write('profiles', profiles); render(); }
-  async function preview(r) { if (B.demo) { notice('演示模式没有 AE 实际画面。'); return; } if (S.read('recovery:' + r.projectKey, null)) throw new Error('请先处理上次中断任务的恢复记录。'); if (!previewTemplate()) throw new Error('AE 中没有可用的 PNG 8 位预览模板，请刷新模板列表。'); try { var result = await runner.preview(r, previewTemplate()); r.previewPath = result.path; r.previewAt = result.at; delete r.previewError; persist(); render(); } catch (e) { r.previewError = e.message; persist(); render(); throw e; } }
-  async function capture() { await sync(); var r = await B.call('capture'); if (!session || r.projectKey !== session.projectKey || r.compId !== session.compId) throw new Error('合成已切换，请重新点击添加组合。'); r.id = C.uid(); session.records.push(r); persist(); render(); await preview(r); }
+  async function preview(r) { if (B.demo) { notice('演示模式没有 AE 实际画面。'); return; } if (S.read('recovery:' + r.projectKey, null)) throw new Error('请先处理上次中断任务的恢复记录。');  try { var result = await runner.preview(r); r.previewPath = result.path; r.previewAt = result.at; delete r.previewError; persist(); render(); } catch (e) { r.previewError = e.message; persist(); render(); throw e; } }
+  async function capture() { await sync(); var r = await B.call('capture'); if (!session || r.projectKey !== session.projectKey || r.compId !== session.compId) throw new Error('合成已切换，请重新点击添加组合。'); r.id = C.uid(); session.records.push(r); persist(); render(); try { await preview(r); $('status').textContent = '组合已记录，可以继续调整独显并添加'; } catch(e) { notice('组合已记录，预览失败：' + e.message,true); } }
   async function updateCombination(old) {
     if (S.jobActive && S.jobActive()) throw new Error('请等待当前渲染完成。');
     if (S.read('recovery:' + old.projectKey, null)) throw new Error('请先处理上次中断任务的恢复记录。');

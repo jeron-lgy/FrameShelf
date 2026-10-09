@@ -18,16 +18,17 @@
         throw error;
       }
     }
-    async function preview(record, template) {
+    async function preview(record) {
       if (running) throw new Error('已有任务正在执行。');
       if (!store.native) return { demo: true };
       var release = store.acquireJob ? store.acquireJob() : function () {};
       running = true;
       var stage;
       try {
-        status('生成组合预览…');
+        status('提取当前帧预览…');
         stage = store.stage();
-        var result = await hostJob('render', { record: record, template: template, directory: stage.directory, preview: true }, [record], record.projectKey);
+        var result = await hostJob('directPreview', { record: record, directory: stage.directory }, [record], record.projectKey);
+        await store.waitPreview(stage, result.path);
         var previewPath = store.savePreview(stage, result.path, record.id);
         store.cleanup(stage);
         return { path: previewPath, at: Date.now() };
