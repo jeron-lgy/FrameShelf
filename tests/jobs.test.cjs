@@ -8,3 +8,9 @@ test('Transport failure retains recovery snapshot and stops remaining renders',a
 test('Known restored host failure clears journal; stop requests keep completed file',async()=>{const e=new Error('cancel');e.needsRecovery=false;const f=fixture(e),r=createRunner(f.bridge,f.store);await assert.rejects(r.batch(f.plan,{directory:'out'}));assert.equal(f.writes.at(-1)[1],null);
 const g=fixture(),q=createRunner(g.bridge,g.store);const out=await q.batch(g.plan,{directory:'out',onResult:()=>q.stop()});assert.equal(out.stopped,true);assert.equal(out.results.length,1);});
 test('Preview uses direct frame extraction rather than export render',async()=>{const f=fixture();let ready=false;f.store.waitPreview=async()=>{ready=true;};f.store.savePreview=()=>{assert.equal(ready,true);return '/preview.png';};const r=createRunner(f.bridge,f.store);const result=await r.preview({projectKey:'p',id:'r'});assert.equal(result.path,'/preview.png');assert.deepEqual(f.calls,['snapshot','directPreview']);});
+
+test('Null native output retains recovery journal instead of accessing path',async()=>{
+ const f=fixture();f.bridge.call=async m=>m==='snapshot'?{projectKey:'p'}:null;
+ const r=createRunner(f.bridge,f.store);await assert.rejects(r.preview({projectKey:'p',id:'r'}),/恢复记录/);
+ assert.equal(f.writes.at(-1)[1].pending,true);assert.equal(r.isRunning(),false);
+});

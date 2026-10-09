@@ -10,6 +10,7 @@
       store.write('recovery:' + projectKey, { pending: true, snapshot: snapshot, directory: args.directory, method: method, at: Date.now() });
       try {
         var result = await bridge.call(method, args);
+        if (!result || typeof result.path !== 'string' || !result.path) throw new Error('AE 未返回有效输出路径；已保留恢复记录，请先检查或恢复合成状态。');
         store.write('recovery:' + projectKey, null);
         return result;
       } catch (error) {

@@ -4,7 +4,7 @@ var RQItemStatus={QUEUED:1,DONE:2,USER_STOPPED:3},GetSettingsFormat={STRING:1},P
 var fail='',rendered=[],restorationFail=false;
 function File(p){this.fsName=p;this.name=p.split('/').pop();this.length=100;} File.decode=function(s){return s;};
 function Folder(p){this.fsName=p;this.exists=true;}Folder.prototype.getFiles=function(){return [new File(this.fsName+'/frame_00000.tif')];};
-function CompItem(id){this.id=id;this.width=64;this.height=36;this.pixelAspect=1;this.frameDuration=.04;this.duration=2;this.time=.4;this.displayStartFrame=0;this.workAreaStart=.2;this.workAreaDuration=1;this.name='产品';this._layers=[{id:100,name:'A',solo:true,enabled:true},{id:101,name:'B',solo:false,enabled:true}];this.numLayers=2;}
+function CompItem(id){this.id=id;this.width=64;this.height=36;this.pixelAspect=1;this.frameDuration=.04;this.duration=2;this.time=.4;this.displayStartFrame=0;this.workAreaStart=.2;this.workAreaDuration=1;this.name='浜у搧';this._layers=[{id:100,name:'A',solo:true,enabled:true},{id:101,name:'B',solo:false,enabled:true}];this.numLayers=2;}
 CompItem.prototype.layer=function(i){return this._layers[i-1];};
 var comp=new CompItem(1),items=[],om={file:new File('/user.tif'),applyTemplate:function(name){if(fail==='template')throw Error('template failure');},getSettings:function(){return {Format:'TIFF Sequence',Depth:'Trillions of Colors+',Channels:'RGB + Alpha',Color:'Straight',Resize:fail==='resize'?'true':'false',Crop:'false'};}};
 function Item(c,original){this.comp=c;this.status=RQItemStatus.QUEUED;this.numOutputModules=1;this.original=original;this._render=true;}
@@ -25,3 +25,15 @@ test('Reordered layers use stable IDs; restore failure is separately recoverable
 
 test('No undo group spans render, including render failures',()=>{for(const mode of ['', 'render']){const h=host();h.ctx.fail=mode;h.ctx.app.beginUndoGroup=()=>{throw Error('Undo group must not be opened');};h.ctx.app.endUndoGroup=()=>{throw Error('Undo group must not be closed');};const out=h.call('render',{record:h.record,template:'custom',directory:'/stage'});assert.equal(out.ok,!mode);if(mode)assert.match(out.error,/render failure/);}});
 test('Direct preview never renders the queue and restores resolution/layers on success or failure',()=>{for(const fail of [false,true]){const h=host();h.ctx.comp.resolutionFactor=[2,2];h.ctx.File.prototype.exists=true;h.ctx.comp.saveFrameToPng=function(t,file){assert.equal(t,h.record.frameIndex*.04);if(fail)throw Error('preview failure');};h.ctx.app.project.renderQueue.render=function(){throw Error('Queue must not render');};const out=h.call('directPreview',{record:h.record,directory:'/preview'});assert.equal(out.ok,!fail);assert.deepEqual(Array.from(h.ctx.comp.resolutionFactor),[2,2]);assert.equal(h.ctx.comp.layer(1).solo,true);assert.equal(h.ctx.original.render,true);assert.equal(h.ctx.items.length,1);}});
+
+test('Disabled layers reject solo writes: direct preview applies and restores safely',()=>{
+ const h=host();vm.runInContext(`comp.resolutionFactor=[1,1];comp.saveFrameToPng=function(){};
+ var layer=comp._layers[1],solo=false;layer.enabled=false;
+ Object.defineProperty(layer,'solo',{get:function(){return solo;},set:function(v){if(!this.enabled)throw Error('disabled solo write');solo=v;}});`,h.ctx);
+ h.record.layers[1].enabled=false;h.record.layers[1].solo=false;
+ assert.equal(h.call('directPreview',{record:h.record,directory:'/stage'}).ok,true);
+ h.record.layers[1].enabled=true;h.record.layers[1].solo=true;
+ assert.equal(h.call('directPreview',{record:h.record,directory:'/stage'}).ok,true);
+ assert.equal(vm.runInContext('comp.layer(2).enabled',h.ctx),false);
+ assert.equal(vm.runInContext('comp.layer(2).solo',h.ctx),false);
+});

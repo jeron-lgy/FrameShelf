@@ -43,9 +43,17 @@ var FrameShelf = (function () {
         }
         return list;
     }
+    function setLayerState(layer, state) {
+        // AE rejects solo assignments on disabled layers, including no-op writes.
+        if (layer.solo !== state.solo) {
+            if (!layer.enabled) { layer.enabled = true; }
+            layer.solo = state.solo;
+        }
+        if (layer.enabled !== state.enabled) { layer.enabled = state.enabled; }
+    }
     function apply(comp, states) {
         var list = resolve(comp, states);
-        for (var i = 0; i < list.length; i++) { list[i].solo = states[i].solo; list[i].enabled = states[i].enabled; }
+        for (var i = 0; i < list.length; i++) { setLayerState(list[i], states[i]); }
     }
     function checkedComp(record) {
         idle();
@@ -93,8 +101,7 @@ var FrameShelf = (function () {
         var layers;
         try { layers = resolve(comp, saved); } catch (e) { errors.push(String(e)); return; }
         for (var i = 0; i < layers.length; i++) {
-            try { layers[i].solo = saved[i].solo; } catch (e1) { errors.push("Solo 恢复失败：" + saved[i].name + " " + e1); }
-            try { layers[i].enabled = saved[i].enabled; } catch (e2) { errors.push("可见状态恢复失败：" + saved[i].name + " " + e2); }
+            try { setLayerState(layers[i], saved[i]); } catch (e1) { errors.push("图层状态恢复失败：" + saved[i].name + " " + e1); }
         }
     }
     function restoreArea(comp, area, errors) {

@@ -6,7 +6,7 @@
 
 ## 安装：直接复制文件夹
 
-1. 解压 `FrameShelf-0.8.0-Portable.zip`，找到 `com.frameshelf.ae` 文件夹。
+1. 解压 `FrameShelf-0.8.1-Portable.zip`，找到 `com.frameshelf.ae` 文件夹。
 2. 关闭 AE，把这个文件夹整体复制到以下目录（目录不存在时可自行创建）：
 
    ```text
@@ -132,3 +132,7 @@ AE 的部分 TIFF 输出把第四通道的 ExtraSamples 标记写成 0（未指�
 - 提取前后恢复图层独显、可见开关与合成预览分辨率；最终高质量导出保持原有 AE 输出模块流程。
 - 原版本 Git 基线：`9071c50`，标签 `frameshelf-0.7.1-baseline`；开发分支 `codex/direct-preview`。
 - 使用 AE 的 `saveFrameToPng` 接口生成画面预览，并非操作系统屏幕截图。该接口没有稳定的公开脚本契约，当前只验证本机 AE 2025，其他版本和复杂效果仍需验收。
+
+## 0.8.1 修复
+
+修正关闭可见性的图层触发 solo 写入错误的问题，应用与恢复图层状态共用安全顺序。AE 返回空输出时保留恢复记录，不再直接读取空值的 path。
