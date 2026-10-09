@@ -45,3 +45,9 @@ test('Preview waits for delayed complete PNG and times out incomplete writes',as
  await s.waitPreview(stage,f,2000);assert.equal(I.inspect(f).kind,'PNG');
  fs.writeFileSync(f,png().subarray(0,40));await assert.rejects(s.waitPreview(stage,f,200),/超时/);
 });
+
+test('Preview storage accepts both 8-bit and 16-bit native PNG and rejects unsupported depth',t=>{
+ const s=createStore(root(t)),stage=s.stage(),f=path.join(stage.directory,'preview.png');
+ for(const bits of [8,16]){fs.writeFileSync(f,png(bits));const saved=s.savePreview(stage,f,'preview'+bits);assert.equal(I.inspect(saved).bits,bits);assert.ok(s.imageUrl(saved).startsWith('data:image/png;base64,'));}
+ fs.writeFileSync(f,png(32));assert.throws(()=>s.savePreview(stage,f,'bad'),/32/);
+});

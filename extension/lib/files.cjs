@@ -116,7 +116,7 @@ function createStore(root) {
   function savePreview(job, source, recordId) {
     assertStage(job, source);
     const info = images.inspect(source);
-    if (info.kind !== 'PNG' || info.bits !== 8 || Math.max(info.width, info.height) > 1600 || fs.statSync(source).size > 16 * 1024 * 1024) throw new Error('预览图片格式或尺寸超出限制。');
+    if (info.kind !== 'PNG' || (info.bits !== 8 && info.bits !== 16) || Math.max(info.width, info.height) > 1600 || fs.statSync(source).size > 16 * 1024 * 1024) throw new Error('预览图片超出限制：' + info.kind + ' / ' + info.bits + ' 位 / ' + info.width + '×' + info.height + ' / ' + fs.statSync(source).size + ' 字节。');
     const target = path.join(root, 'previews', digest(recordId) + '.png');
     fs.copyFileSync(source, target);
     return target;
