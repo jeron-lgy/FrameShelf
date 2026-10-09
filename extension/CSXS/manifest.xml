@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.frameshelf.ae" ExtensionBundleVersion="0.8.6" ExtensionBundleName="Frame Shelf">
-  <ExtensionList><Extension Id="com.frameshelf.ae.panel" Version="0.8.6"/><Extension Id="com.frameshelf.ae.export" Version="0.8.6"/></ExtensionList>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.frameshelf.ae" ExtensionBundleVersion="0.8.7" ExtensionBundleName="Frame Shelf">
+  <ExtensionList><Extension Id="com.frameshelf.ae.panel" Version="0.8.7"/><Extension Id="com.frameshelf.ae.export" Version="0.8.7"/><Extension Id="com.frameshelf.ae.exportpanel" Version="0.8.7"/></ExtensionList>
   <ExecutionEnvironment>
     <HostList><Host Name="AEFT" Version="[25.0,25.9]"/></HostList>
     <LocaleList><Locale Code="All"/></LocaleList>
@@ -23,6 +23,13 @@
       <Size><Width>1280</Width><Height>800</Height></Size>
       <MinSize><Width>900</Width><Height>560</Height></MinSize>
       <MaxSize><Width>3840</Width><Height>2160</Height></MaxSize>
+    </Geometry></UI>
+  </DispatchInfo></Extension><Extension Id="com.frameshelf.ae.exportpanel"><DispatchInfo>
+    <Resources><MainPath>./index.html</MainPath><ScriptPath>./host/main.jsx</ScriptPath><CEFCommandLine><Parameter>--enable-nodejs</Parameter><Parameter>--mixed-context</Parameter></CEFCommandLine></Resources>
+    <Lifecycle><AutoVisible>true</AutoVisible></Lifecycle>
+    <UI><Type>Panel</Type><Menu>Frame Shelf · 命名与导出（兼容面板）</Menu><Geometry>
+      <Size><Width>1280</Width><Height>800</Height></Size>
+      <MinSize><Width>900</Width><Height>560</Height></MinSize>
     </Geometry></UI>
   </DispatchInfo></Extension></DispatchInfoList>
 </ExtensionManifest>

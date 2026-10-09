@@ -94,3 +94,10 @@ AE 25.2 本机 OutputModule reflect 方法探测未发现原生设置对话框�
 ## 0.8.2 16 位 PNG 预览兼容
 
 读取用户失败任务实际文件：两张均 PNG RGBA 16 位、338×924，分别 8179 / 652123 字节。旧 savePreview 只接受 8 位，导致误拒绝。修复后复制这两张原文件到独立测试目录，完整执行 waitPreview → savePreview → imageUrl，均成功。自动测试 40/40。尚未验证重装后的 CEP 页面显示，不以外部解码成功替代完整 UI 验收。
+
+
+## 0.8.6 实际 IME 诊断与 0.8.7 对照
+
+用户完成三个无业务绑定控件和产品名的输入尝试。日志共 10 条，全部 focusin/focusout；无 composition / beforeinput / input / change。三个空控件长度一直为 0；产品字段保持原有 3 个汉字。事件时控件 connected=true、disabled=false。运行时 AdobeCEP/12.0.1、Chrome/99.0.4844.84。这组记录不支持字段保存覆盖输入的假设，定位范围转向宿主输入事件投递；不能仅凭这些日志断定具体 CEP 缺陷。
+
+0.8.7 增加相同页面的 Panel 类型入口，保留原 Modeless 入口。等待真实 IME 选字验证，未宣称兼容面板已解决问题。

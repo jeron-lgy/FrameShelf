@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var exportWindow = window.__adobe_cep__ ? window.__adobe_cep__.getExtensionId() === 'com.frameshelf.ae.export' : new URLSearchParams(location.search).get('window') === 'export';
+  var exportWindow = window.__adobe_cep__ ? /^com\.frameshelf\.ae\.export(panel)?$/.test(window.__adobe_cep__.getExtensionId()) : new URLSearchParams(location.search).get('window') === 'export';
   document.body.classList.add(exportWindow ? 'export-window' : 'capture-window');
   var popup = null;
   var C = window.FrameShelfCore, B = window.FrameShelfBridge, S = window.FrameShelfStorage;
@@ -22,7 +22,7 @@
   }
   ['compositionstart','compositionupdate','compositionend','beforeinput','input','change','focusin','focusout'].forEach(function (name) { document.addEventListener(name, traceInput, true); });
   function inputDiagnostic() {
-    inputTrace = { version: '0.8.6', started: Date.now(), userAgent: navigator.userAgent, events: [] };
+    inputTrace = { version: '0.8.7', extension: window.__adobe_cep__ ? window.__adobe_cep__.getExtensionId() : 'browser', started: Date.now(), userAgent: navigator.userAgent, events: [] };
     var box = node('div');
     box.append(node('p', '请分别输入并选字。这里只检查输入，不修改产品名，也不记录文字内容。'));
     [['input','原始输入框（无字段逻辑）'],['input','明确 text 类型'],['textarea','多行输入框']].forEach(function (spec,index) {
@@ -263,6 +263,13 @@
   if (exportWindow) {
     $('board-tools').append(document.querySelector('.naming'));
     document.querySelector('.toolbar').append(button('输入诊断', inputDiagnostic));
+    if (window.__adobe_cep__ && window.__adobe_cep__.getExtensionId() === 'com.frameshelf.ae.export') {
+      document.querySelector('.toolbar').append(button('兼容面板', function () {
+        persist();
+        window.__adobe_cep__.requestOpenExtension('com.frameshelf.ae.exportpanel', '');
+        window.__adobe_cep__.closeExtension();
+      }));
+    }
     document.querySelector('.toolbar').append(document.querySelector('.tabs'), $('close-board'));
     document.querySelector('.tabs [data-page=workspace]').firstChild.textContent = '命名导出 ';
     document.querySelector('#output-heading').append($('assignment-count'));
