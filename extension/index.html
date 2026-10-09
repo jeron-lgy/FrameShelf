@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Frame Shelf · 组合导出</title>
+  <link rel="stylesheet" href="css/panel.css">
+  <link rel="stylesheet" href="css/export.css">
+</head>
+<body>
+  <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-shelf" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 14h16M8 5v9M11 10l3-3 6 6"/></symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-stack" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 14-1l1 2M4 16l1 2a8 8 0 0 0 14-1"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V4h7l2 3h9v13H3V7ZM3 8h18"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><path d="M3 3h18v18H3zM3 17l6-6 5 5 3-3 4 4"/><circle cx="16" cy="8" r="1.5"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 3h13l4 4v14H3V3h1ZM7 3v6h10V3M7 21v-8h10v8"/></symbol>
+  </defs></svg>
+  <header class="toolbar">
+    <div class="brand"><svg><use href="#i-shelf"/></svg><span>Frame<span class="brand-light">Shelf</span><small>组合导出</small></span></div>
+    <label class="search"><svg><use href="#i-search"/></svg><input id="search" placeholder="搜索组合" aria-label="搜索组合"><kbd>/</kbd></label>
+    <div class="tools">
+      <button id="add-record" class="tool accent" title="记录当前独显组合"><svg><use href="#i-stack"/></svg><span>添加组合</span></button>
+      <button id="refresh-previews" class="tool" title="刷新全部预览"><svg><use href="#i-refresh"/></svg><span class="wide-label">刷新预览</span></button>
+      <span class="tool-divider"></span>
+      <button id="export-top" class="tool" title="打开独立命名导出窗口"><svg><use href="#i-export"/></svg><span>命名与导出 ↗</span></button>
+    </div>
+  </header>
+  <nav class="tabs" aria-label="面板视图">
+    <button class="tab active" data-page="workspace">组合库 <span id="record-count">0</span></button>
+    <button class="tab" data-page="history">导出记录 <span id="history-count">0</span></button>
+    <div class="host-indicator"><i id="host-dot"></i><span id="host-label">连接 AE…</span></div>
+  </nav>
+  <div id="scope-label" class="scope-label">等待当前合成…</div>
+  <div id="demo-banner" class="banner" hidden>界面演示 · 不会操作 AE 或导出文件 <button id="load-demo">载入示例组合</button></div>
+  <div id="recovery-banner" class="banner warning" hidden>上次任务意外中断，请检查组合开关和渲染队列。<button id="recover">恢复任务前状态</button><button id="dismiss-recovery">已手动检查</button></div>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <main id="workspace" class="workspace page">
+    <section class="library">
+      <div class="section-heading"><div><p class="eyebrow">COMPOSITION VARIANTS</p><h1>你的组合库</h1></div><span class="pill" id="project-bits">—</span></div>
+      <div class="project-line"><span class="project-mark">Ae</span><span id="project-name">等待连接工程</span><button id="sync-project" class="icon-button" title="重新读取当前工程"><svg><use href="#i-refresh"/></svg></button></div>
+      <div id="gallery" class="gallery"></div>
+      <div id="empty-library" class="empty-library">
+        <div class="empty-art"><div></div><div></div><div><svg><use href="#i-stack"/></svg></div></div>
+        <h2>把不同组合，放在一起。</h2>
+        <p>在 AE 中调整独显和当前帧，<br>点击「添加组合」，最后统一导出。</p>
+        <button id="empty-add" class="primary"><svg><use href="#i-add"/></svg>记录第一个组合</button>
+        <small>记录图层开关 · 输出时读取最新工程内容</small>
+      </div>
+      <p class="library-note" id="library-note" hidden><span class="tiny-dot"></span>预览仅供分配名称。工程内容变化后，可刷新预览。</p>
+    </section>
+    <aside class="naming">
+      <div class="section-heading"><div><p class="eyebrow">NAMING TEMPLATE</p><h2>命名预设</h2></div></div>
+      <label class="field-label" for="preset">选择预设</label>
+      <div class="input-row"><select id="preset" aria-label="命名预设"></select><button id="delete-preset" class="icon-button" title="删除当前预设"><svg><use href="#i-close"/></svg></button></div>
+      <div class="preset-actions"><button id="save-preset" class="secondary">另存预设</button><button id="update-preset" class="secondary">更新预设</button></div>
+      <div class="field-composer"><h2>命名字段</h2><p class="small muted">按以下顺序组合 · 拖动调整顺序</p><div id="fields-editor"></div>
+      <select id="add-field" aria-label="添加字段"><option value="">添加字段…</option><option value="fixed">固定名称 · 所有槽位同步</option><option value="wildcard">通配符字段 · 日期时间</option><option value="custom">自定义名字 · 每个槽位独立</option></select>
+      <label class="separator-row">字段分隔符<input id="field-separator" maxlength="10" aria-label="字段分隔符" placeholder="留空直接拼接"></label><p class="small muted">最多 10 个字符，支持空格或留空</p></div>
+      <span id="assignment-count" hidden></span>
+    </aside>
+  </main>
+  <section id="board" class="page board-page" hidden><div class="section-heading"><h1>拖拽分配输出名称</h1><button id="close-board" class="secondary">返回组合库</button></div><p>将左侧组合拖到右侧名称卡片；也可以先点选组合，再点击目标卡片。</p><div class="board-shell"><div id="board-tools"></div><div class="board-layout"><div class="source-column"><div class="column-heading"><h2>组合预览</h2><span>拖到右侧</span></div><div id="board-records"></div></div><div class="output-column"><div class="section-heading" id="output-heading"><h2>输出名称</h2><button id="add-slot" class="secondary">＋ 添加名称</button></div><div id="board-targets"></div></div></div></div></section><section id="history" class="page history-page" hidden>
+    <div class="section-heading"><div><p class="eyebrow">EXPORT HISTORY</p><h1>每一次交付，都有记录。</h1></div></div>
+    <div id="history-list"></div>
+  </section>
+  <footer class="export-bar">
+    <div class="output-summary"><label for="output-template">AE 输出模板</label><div class="template-controls"><select id="output-template"></select><button id="edit-output-template" class="secondary" title="打开 AE 模板管理器，需在原生窗口选择要编辑的模板">管理模板</button><button id="reload-profiles" class="secondary" title="刷新模板列表"><svg><use href="#i-refresh"/></svg></button></div><div id="profile-details"></div></div>
+    <div class="directory"><label>保存到</label><button id="choose-directory" title="选择输出目录"><svg><use href="#i-folder"/></svg><span id="directory-label">选择文件夹</span></button></div>
+    <button id="export-button" class="primary export-button"><svg><use href="#i-export"/></svg><span>检查并导出</span><b id="export-count">0</b></button>
+    <button id="stop-button" class="secondary" hidden>当前帧后停止</button>
+  </footer>
+  <div class="status-line"><span id="status">准备就绪</span><span id="version">FRAME SHELF / 0.7.1</span></div>
+  <div id="progress-track" class="progress-track" hidden><div id="progress-fill"></div></div>
+  <dialog id="dialog"><form id="dialog-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="dialog-close" class="icon-button" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div><div id="dialog-content"></div><div class="dialog-actions"><button type="button" id="dialog-cancel" class="secondary">取消</button><button type="submit" id="dialog-submit" class="primary">保存</button></div></form></dialog>
+  <script src="js/core.js"></script><script src="js/storage.js"></script><script src="js/bridge.js"></script><script src="js/jobs.js"></script><script src="js/app.js"></script>
+</body>
+</html>
