@@ -2,6 +2,14 @@
   'use strict';
   var demo = !window.__adobe_cep__, demoCount = 0;
   function call(method, args) {
+    if (!demo && method === 'chooseFolder') return new Promise(function (resolve, reject) {
+      try {
+        if (!window.cep || !window.cep.fs || !window.cep.fs.showOpenDialogEx) throw new Error('当前 CEP 不支持此选择器，请使用输入路径。');
+        var selected = window.cep.fs.showOpenDialogEx(false, true, '选择输出文件夹', (args && args.initialPath) || '', [], '', '选择文件夹');
+        if (!selected || selected.err) throw new Error('文件夹选择器无法打开，请使用输入路径。');
+        resolve(selected.data && selected.data.length ? selected.data[0] : null);
+      } catch (error) { reject(error); }
+    });
     if (!demo) return new Promise(function (resolve, reject) {
       var script = 'FrameShelf.dispatch(' + JSON.stringify(method) + ',' + JSON.stringify(JSON.stringify(args || {})) + ')';
       window.__adobe_cep__.evalScript(script, function (raw) {

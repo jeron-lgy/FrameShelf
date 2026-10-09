@@ -121,13 +121,19 @@ function createStore(root) {
     fs.copyFileSync(source, target);
     return target;
   }
+  function validateDirectory(value) {
+    const directory = String(value || '').trim().replace(/^"(.*)"$/, '$1');
+    if (!path.isAbsolute(directory)) throw new Error('请输入完整文件夹路径。');
+    if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) throw new Error('文件夹不存在，请检查路径。');
+    return path.normalize(directory);
+  }
   function imageUrl(file) {
     if (!file || !fs.existsSync(file)) return '';
     const real = fs.realpathSync(file), previewRoot = fs.realpathSync(path.join(root, 'previews'));
     if (path.dirname(real) !== previewRoot || fs.statSync(real).size > 16 * 1024 * 1024) return '';
     return 'data:image/png;base64,' + fs.readFileSync(real).toString('base64');
   }
-  return { root, native: true, read, write, stage, cleanup, publish, availableNames, waitPreview, savePreview, imageUrl, verify: images.verify,
+  return { root, native: true, read, write, stage, cleanup, publish, availableNames, validateDirectory, waitPreview, savePreview, imageUrl, verify: images.verify,
     normalizeOutput: (job, file, profile) => { assertStage(job, file); return images.normalizeTiffAlpha(file, profile); },
     withStateLock, acquireJob: () => acquireLock('render'), jobActive: () => activeLock('render') };
 }

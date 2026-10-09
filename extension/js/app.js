@@ -218,7 +218,8 @@
   $('update-preset').onclick = guard(function () { var p = config.presets.find(function (p) { return p.id === session.presetId; }); if (!p) throw new Error('请先另存为一个预设'); Object.assign(p,C.namingPreset(session,p.id,p.name)); persist(); notice('预设已更新：' + p.name); });
   $('delete-preset').onclick = guard(function () { config.presets = config.presets.filter(function (p) { return p.id !== session.presetId; }); session.presetId = ''; persist(); render(); });
   $('output-template').onchange = function () { config.settings.outputTemplate = this.value; persist(); render(); };
-  $('choose-directory').onclick = guard(async function () { var dir = await B.call('chooseFolder'); if (dir) { config.settings.outputDir = dir; persist(); settings(); } });
+  $('enter-directory').onclick = guard(function () { ask('输出文件夹路径', config.settings.outputDir || '', function (value) { config.settings.outputDir = S.validateDirectory ? S.validateDirectory(value) : value; persist(); settings(); }); });
+  $('choose-directory').onclick = guard(async function () { var dir = await B.call('chooseFolder', { initialPath: config.settings.outputDir || '' }); if (dir) { config.settings.outputDir = dir; persist(); settings(); } });
   $('stop-button').onclick = function () { runner.stop(); $('status').textContent = '停止请求已记录，等待当前帧结束…'; };
   $('recover').onclick = guard(async function () { var journal = S.read('recovery:' + session.projectKey, null); await B.call('recover', { snapshot: journal.snapshot }); S.write('recovery:' + session.projectKey, null); checkRecovery(); notice('已恢复任务前的图层开关和原队列勾选状态。'); });
   $('dismiss-recovery').onclick = guard(function () { S.write('recovery:' + session.projectKey, null); checkRecovery(); });
