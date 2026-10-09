@@ -6,12 +6,8 @@
   var C = window.FrameShelfCore, B = window.FrameShelfBridge, S = window.FrameShelfStorage;
   var $ = function (id) { return document.getElementById(id); }, config, session, profiles = [], busy = false, info, accept;
   function node(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
-  function bindText(input, save) {
-    var composing = false;
-    input.addEventListener('compositionstart', function () { composing = true; });
-    input.addEventListener('compositionend', function () { composing = false; save(); });
-    input.addEventListener('input', function (e) { if (!composing && !e.isComposing) save(); });
-  }
+  var inputGate = window.FrameShelfTextInput.createGate(document);
+  function bindText(input, save) { inputGate.bind(input, function () { try { save(); } catch (e) { notice(e.message, true); } }); }
   function button(text, fn) { var b = node('button', text, 'quiet'); b.type = 'button'; b.onclick = guard(fn); return b; }
   var noticeTimer;
   function notice(text, error) { clearTimeout(noticeTimer); if (text && !error) noticeTimer = setTimeout(function () { $('notice').hidden = true; }, 4500); $('notice').hidden = !text; $('notice').textContent = text || ''; $('notice').className = error ? 'warning' : ''; }
@@ -227,11 +223,12 @@
   var lastShared = '';
   var polling = false;
   async function refreshShared() {
-    if (!config || fieldDragging || polling || busy || $('dialog').open || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) || (S.jobActive && S.jobActive())) return;
+    if (!config || fieldDragging || polling || busy || $('dialog').open || inputGate.blocked() || (S.jobActive && S.jobActive())) return;
     polling = true;
+    var inputRevision = inputGate.revision();
     try {
       var next = await B.call('info');
-      if (fieldDragging || busy || $('dialog').open || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+      if (inputRevision !== inputGate.revision() || fieldDragging || busy || $('dialog').open || inputGate.blocked()) return;
       adoptInfo(next);
       if (!session || session.compId == null) return;
       var saved = S.read(C.sessionKey(session.projectKey, session.compId), null), cfg = S.read('config', config), signature = JSON.stringify([saved,cfg]);
