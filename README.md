@@ -6,7 +6,7 @@
 
 ## 安装：直接复制文件夹
 
-1. 解压 `FrameShelf-0.8.8-Portable.zip`，找到 `com.frameshelf.ae` 文件夹。
+1. 解压 `FrameShelf-0.8.9-Portable.zip`，找到 `com.frameshelf.ae` 文件夹。
 2. 关闭 AE，把这个文件夹整体复制到以下目录（目录不存在时可自行创建）：
 
    ```text
@@ -21,7 +21,7 @@
 
    安装后必须能找到 `extensions\com.frameshelf.ae\CSXS\manifest.xml`，不要多套一层文件夹。此版本是 CEP 面板，不能放进 AE 的 `Support Files\Plug-ins` 或 `Scripts\ScriptUI Panels` 目录。
 3. 更新已有版本时，先将旧 `com.frameshelf.ae` 文件夹备份到 extensions 目录外，再复制新的文件夹；避免安装两份相同扩展。无需运行 cmd 或 PowerShell。
-4. 重启 AE 2025，在「窗口 → 扩展」打开 `Frame Shelf · 组合导出`。
+4. 重启 AE 2025，在「窗口 → 扩展」打开 `Frame Shelf · 分层导出`。
 5. AE「首选项 → 脚本和表达式」需要启用「允许脚本写入文件和访问网络」。插件本身不需要网络。
 
 ### 未签名测试版的首次加载
@@ -163,4 +163,8 @@ AE 的部分 TIFF 输出把第四通道的 ExtraSamples 标记写成 0（未指�
 
 ## 0.8.8 正式采用面板窗口
 
-用户实测同一命名页面在 Panel 窗口可正常直接输入中文，原 Modeless 窗口失败。移除 Modeless 入口，保留已验证的 exportpanel ID 和 Panel 类型。AE 扩展菜单仅显示「Frame Shelf · 组合导出」；通过插件内「命名与导出」打开命名面板，可按 AE 面板方式浮动或停靠。移除输入诊断与兼容切换按钮，停止诊断采集。历史组合、名称及预设不变，无需迁移。
+用户实测同一命名页面在 Panel 窗口可正常直接输入中文，原 Modeless 窗口失败。移除 Modeless 入口，保留已验证的 exportpanel ID 和 Panel 类型。AE 扩展菜单仅显示「Frame Shelf · 分层导出」；通过插件内「命名与导出」打开命名面板，可按 AE 面板方式浮动或停靠。移除输入诊断与兼容切换按钮，停止诊断采集。历史组合、名称及预设不变，无需迁移。
+
+## 0.8.9 名称与版本显示
+
+扩展菜单、页面标题及品牌说明统一改为分层导出。组合库和命名面板底部均固定显示 v0.8.9，窄面板也不隐藏，状态消息过长时省略消息以保留版本号。

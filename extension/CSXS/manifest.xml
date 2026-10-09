@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.frameshelf.ae" ExtensionBundleVersion="0.8.8" ExtensionBundleName="Frame Shelf">
-  <ExtensionList><Extension Id="com.frameshelf.ae.panel" Version="0.8.8"/><Extension Id="com.frameshelf.ae.exportpanel" Version="0.8.8"/></ExtensionList>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.frameshelf.ae" ExtensionBundleVersion="0.8.9" ExtensionBundleName="Frame Shelf">
+  <ExtensionList><Extension Id="com.frameshelf.ae.panel" Version="0.8.9"/><Extension Id="com.frameshelf.ae.exportpanel" Version="0.8.9"/></ExtensionList>
   <ExecutionEnvironment>
     <HostList><Host Name="AEFT" Version="[25.0,25.9]"/></HostList>
     <LocaleList><Locale Code="All"/></LocaleList>
@@ -12,7 +12,7 @@
       <CEFCommandLine><Parameter>--enable-nodejs</Parameter><Parameter>--mixed-context</Parameter></CEFCommandLine>
     </Resources>
     <Lifecycle><AutoVisible>true</AutoVisible></Lifecycle>
-    <UI><Type>Panel</Type><Menu>Frame Shelf · 组合导出</Menu><Geometry>
+    <UI><Type>Panel</Type><Menu>Frame Shelf · 分层导出</Menu><Geometry>
       <Size><Width>920</Width><Height>650</Height></Size>
       <MinSize><Width>360</Width><Height>380</Height></MinSize>
     </Geometry></UI>

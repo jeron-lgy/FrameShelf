@@ -60,3 +60,7 @@
 .export-window #board-records .source-select{display:flex;flex-direction:column;align-items:stretch;gap:8px;width:100%;padding:0;text-align:left;font-size:11px;line-height:1.5;white-space:normal;overflow-wrap:anywhere;cursor:grab}.export-window #board-records .source-delete{align-self:flex-end;border-top:1px solid #343d46;width:100%;padding:7px 0 0;text-align:right;font-size:10px;color:#bca19e}.export-window #board-records .source-delete:hover{color:#ffc2b5}
 
 .export-window .target .slot-top{align-items:flex-start;min-width:0}.export-window .target .slot-top input[type=checkbox]{margin-top:3px}.export-window .target .slot-top .filename-preview{font-size:13px;font-weight:600;line-height:1.5;flex:1;min-width:0;overflow-wrap:anywhere}
+
+/* Version remains visible in both capture and naming panels, including narrow layouts. */
+.status-line #status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-line #version,.export-window .status-line #version{display:inline-block;flex:none;white-space:nowrap;font-size:11px;letter-spacing:0;color:#aebbc7;margin-left:12px}

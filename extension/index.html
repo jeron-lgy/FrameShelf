@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
-  <title>Frame Shelf · 组合导出</title>
+  <title>Frame Shelf · 分层导出</title>
   <link rel="stylesheet" href="css/panel.css">
   <link rel="stylesheet" href="css/export.css">
 </head>
@@ -25,7 +25,7 @@
     <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 3h13l4 4v14H3V3h1ZM7 3v6h10V3M7 21v-8h10v8"/></symbol>
   </defs></svg>
   <header class="toolbar">
-    <div class="brand"><svg><use href="#i-shelf"/></svg><span>Frame<span class="brand-light">Shelf</span><small>组合导出</small></span></div>
+    <div class="brand"><svg><use href="#i-shelf"/></svg><span>Frame<span class="brand-light">Shelf</span><small>分层导出</small></span></div>
     <label class="search"><svg><use href="#i-search"/></svg><input id="search" placeholder="搜索组合" aria-label="搜索组合"><kbd>/</kbd></label>
     <div class="tools">
       <button id="add-record" class="tool accent" title="记录当前独显组合"><svg><use href="#i-stack"/></svg><span>添加组合</span></button>
@@ -78,7 +78,7 @@
     <button id="export-button" class="primary export-button"><svg><use href="#i-export"/></svg><span>检查并导出</span><b id="export-count">0</b></button>
     <button id="stop-button" class="secondary" hidden>当前帧后停止</button>
   </footer>
-  <div class="status-line"><span id="status">准备就绪</span><span id="version">FRAME SHELF / 0.8.8</span></div>
+  <div class="status-line"><span id="status">准备就绪</span><span id="version">v0.8.9</span></div>
   <div id="progress-track" class="progress-track" hidden><div id="progress-fill"></div></div>
   <dialog id="dialog"><form id="dialog-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="dialog-close" class="icon-button" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div><div id="dialog-content"></div><div class="dialog-actions"><button type="button" id="dialog-cancel" class="secondary">取消</button><button type="submit" id="dialog-submit" class="primary">保存</button></div></form></dialog>
   <script src="js/core.js"></script><script src="js/storage.js"></script><script src="js/bridge.js"></script><script src="js/jobs.js"></script><script src="js/text-input.js"></script><script src="js/app.js"></script>
