@@ -6,6 +6,12 @@
   var C = window.FrameShelfCore, B = window.FrameShelfBridge, S = window.FrameShelfStorage;
   var $ = function (id) { return document.getElementById(id); }, config, session, profiles = [], busy = false, info, accept;
   function node(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
+  function bindText(input, save) {
+    var composing = false;
+    input.addEventListener('compositionstart', function () { composing = true; });
+    input.addEventListener('compositionend', function () { composing = false; save(); });
+    input.addEventListener('input', function (e) { if (!composing && !e.isComposing) save(); });
+  }
   function button(text, fn) { var b = node('button', text, 'quiet'); b.type = 'button'; b.onclick = guard(fn); return b; }
   var noticeTimer;
   function notice(text, error) { clearTimeout(noticeTimer); if (text && !error) noticeTimer = setTimeout(function () { $('notice').hidden = true; }, 4500); $('notice').hidden = !text; $('notice').textContent = text || ''; $('notice').className = error ? 'warning' : ''; }
@@ -54,16 +60,16 @@
       function filename() { try { result.textContent = C.slotFilename(session, session.slots.find(function(x){return x.id===s.id;}) || s) + (profile() ? profile().ext : ''); } catch (e) { result.textContent = e.message; } }
       check.onchange = function () { s.selected = check.checked; session.slots.find(function (x) { return x.id === s.id; }).selected = check.checked; card.classList.toggle('not-selected', !check.checked); persist(); totals(); };
       var remove = button('删除卡槽', function () { session.slots = session.slots.filter(function (x) { return x.id !== s.id; }); persist(); render(); }); remove.title = '删除输出名称';
-      top.append(check, node('span', '输出 ' + (session.slots.indexOf(s) + 1), 'slot-caption'));
+      top.append(check, result);
       var inputs = node('div',null,'slot-custom-fields');
       session.naming.fields.filter(function(f){return f.type==='custom';}).forEach(function(f){
         var label=node('label',f.label), input=node('input'); input.value=(s.values||{})[f.id]||'';input.setAttribute('aria-label',f.label+' · 输出 '+(session.slots.indexOf(s)+1));
-        input.oninput=function(){var current=session.slots.find(function(x){return x.id===s.id;});current.values=current.values||{};current.values[f.id]=input.value;persist();updateNames();};label.append(input);inputs.append(label);
+        bindText(input,function(){var current=session.slots.find(function(x){return x.id===s.id;});current.values=current.values||{};current.values[f.id]=input.value;persist();updateNames();});label.append(input);inputs.append(label);
       });
       var r = session.records.find(function (r) { return r.id === s.recordId; });
       var visual = button('', function () { if (!picked) { notice('先点选左侧组合，或把组合拖入此卡片。'); return; } C.assign(session, s.id, picked); persist(); render(); });
       visual.className = 'assignment-visual'; visual.setAttribute('aria-label', '分配组合到 ' + s.pattern); visual.append(r ? image(r) : node('span', '拖入组合 / 点击分配', 'drop-hint'));
-      var actions = node('div', null, 'slot-actions'); actions.append(button('清除分配', function () { C.assign(session, s.id, null); persist(); render(); }), remove); card.append(top, inputs, visual, node('small', r ? r.label : '尚未分配'), result, actions); filename();
+      var actions = node('div', null, 'slot-actions'); actions.append(button('清除分配', function () { C.assign(session, s.id, null); persist(); render(); }), remove); card.append(top, inputs, visual, node('small', r ? r.label : '尚未分配'), actions); filename();
       if (s.selected === false) card.classList.add('not-selected');
       card.ondragover = function (e) { if (!busy) { e.preventDefault(); card.classList.add('drag-over'); } }; card.ondragleave = function () { card.classList.remove('drag-over'); };
       card.ondrop = guard(function (e) { e.preventDefault(); C.assign(session, s.id, e.dataTransfer.getData('text/plain')); persist(); render(); }); $('board-targets').append(card);
@@ -96,10 +102,10 @@
     $('fields-editor').replaceChildren();
     var names={fixed:'固定名称',wildcard:'通配符字段',custom:'自定义名字'};
     session.naming.fields.forEach(function(f,index){
-      var row=node('div',null,'ordered-field'), badge=node('span',String(index+1),'field-number'), body=node('div',null,'ordered-body');row.draggable=true;row.dataset.fieldId=f.id;
+      var row=node('div',null,'ordered-field'), badge=node('span',String(index+1),'field-number'), body=node('div',null,'ordered-body');row.dataset.fieldId=f.id;
       var title=node('input');title.value=f.label;title.setAttribute('aria-label','字段标题 '+(index+1));title.onchange=function(){session.naming.fields.find(function(x){return x.id===f.id;}).label=title.value||names[f.type];persist();render();};
       body.append(title,node('small',names[f.type]));
-      if(f.type!=='custom'){var value=node('input');value.value=f.value;value.setAttribute('aria-label',f.label+' 内容');value.oninput=function(){session.naming.fields.find(function(x){return x.id===f.id;}).value=value.value;persist();updateNames();};body.append(value);}
+      if(f.type!=='custom'){var value=node('input');value.value=f.value;value.setAttribute('aria-label',f.label+' 内容');bindText(value,function(){session.naming.fields.find(function(x){return x.id===f.id;}).value=value.value;persist();updateNames();});body.append(value);}
       else body.append(node('small','在每张输出卡片分别填写'));
       var actions=node('div',null,'order-actions');
       var up=button('上移',function(){C.moveField(session,f.id,index-1);persist();render();}),down=button('下移',function(){C.moveField(session,f.id,index+1);persist();render();});
