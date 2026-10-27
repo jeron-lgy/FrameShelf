@@ -28,10 +28,11 @@
     <div class="brand"><svg><use href="#i-shelf"/></svg><span>Frame<span class="brand-light">Shelf</span><small>分层导出</small></span></div>
     <label class="search"><svg><use href="#i-search"/></svg><input id="search" placeholder="搜索组合" aria-label="搜索组合"><kbd>/</kbd></label>
     <div class="tools">
-      <button id="add-record" class="tool accent" title="记录当前独显组合"><svg><use href="#i-stack"/></svg><span>添加组合</span></button>
-      <button id="refresh-previews" class="tool" title="刷新全部预览"><svg><use href="#i-refresh"/></svg><span class="wide-label">刷新预览</span></button>
+      <button id="add-record" class="tool accent" title="记录当前独显组合" aria-label="添加组合"><svg><use href="#i-stack"/></svg></button>
+      <button id="save-png-copy" class="tool" title="保存当前合成当前帧的原尺寸 PNG，并复制文件用于粘贴发送" aria-label="保存 PNG 并复制"><svg><use href="#i-save"/></svg></button>
+      <button id="refresh-previews" class="tool" title="刷新全部预览" aria-label="刷新全部预览"><svg><use href="#i-refresh"/></svg></button>
       <span class="tool-divider"></span>
-      <button id="export-top" class="tool" title="打开独立命名导出窗口"><svg><use href="#i-export"/></svg><span>命名与导出 ↗</span></button>
+      <button id="export-top" class="tool" title="打开独立命名导出窗口" aria-label="命名与导出"><svg><use href="#i-export"/></svg></button>
     </div>
   </header>
   <nav class="tabs" aria-label="面板视图">
@@ -78,7 +79,7 @@
     <button id="export-button" class="primary export-button"><svg><use href="#i-export"/></svg><span>检查并导出</span><b id="export-count">0</b></button>
     <button id="stop-button" class="secondary" hidden>当前帧后停止</button>
   </footer>
-  <div class="status-line"><span id="status">准备就绪</span><span id="version">v0.8.9</span></div>
+  <div class="status-line"><span id="status">准备就绪</span><span id="version">v0.9.3</span></div>
   <div id="progress-track" class="progress-track" hidden><div id="progress-fill"></div></div>
   <dialog id="dialog"><form id="dialog-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="dialog-close" class="icon-button" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div><div id="dialog-content"></div><div class="dialog-actions"><button type="button" id="dialog-cancel" class="secondary">取消</button><button type="submit" id="dialog-submit" class="primary">保存</button></div></form></dialog>
   <script src="js/core.js"></script><script src="js/storage.js"></script><script src="js/bridge.js"></script><script src="js/jobs.js"></script><script src="js/text-input.js"></script><script src="js/app.js"></script>

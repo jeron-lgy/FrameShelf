@@ -37,3 +37,7 @@ test('Disabled layers reject solo writes: direct preview applies and restores sa
  assert.equal(vm.runInContext('comp.layer(2).enabled',h.ctx),false);
  assert.equal(vm.runInContext('comp.layer(2).solo',h.ctx),false);
 });
+
+test('Full-size PNG uses resolution 1 and restores resolution after extraction failure',()=>{for(const fail of [false,true]){const h=host();h.ctx.comp.width=15000;h.record.width=15000;h.ctx.comp.resolutionFactor=[4,4];h.ctx.comp.saveFrameToPng=function(){assert.deepEqual(Array.from(h.ctx.comp.resolutionFactor),[1,1]);if(fail)throw Error('png failure');};const out=h.call('directPng',{record:h.record,directory:'/stage'});assert.equal(out.ok,!fail);assert.deepEqual(Array.from(h.ctx.comp.resolutionFactor),[4,4]);assert.equal(h.ctx.comp.layer(1).solo,true);assert.equal(h.ctx.items.length,1);}});
+
+test('Output path readback corruption stops before render and returns diagnostics',()=>{const h=host();vm.runInContext(`Object.defineProperty(om,'file',{get:function(){return new File('/corrupted/frame.tif');},set:function(){}});`,h.ctx);const out=h.call('render',{record:h.record,template:'custom',directory:'/中文/stage'});assert.equal(out.ok,false);assert.match(out.error,/回读路径/);assert.equal(out.diagnostics.requestedDirectory,'/中文/stage');assert.equal(out.diagnostics.assignedOutput,'/corrupted/frame.tif');assert.equal(h.ctx.rendered.length,0);assert.equal(h.ctx.items.length,1);});

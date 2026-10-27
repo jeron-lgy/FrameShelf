@@ -51,3 +51,11 @@ test('Preview storage accepts both 8-bit and 16-bit native PNG and rejects unsup
  for(const bits of [8,16]){fs.writeFileSync(f,png(bits));const saved=s.savePreview(stage,f,'preview'+bits);assert.equal(I.inspect(saved).bits,bits);assert.ok(s.imageUrl(saved).startsWith('data:image/png;base64,'));}
  fs.writeFileSync(f,png(32));assert.throws(()=>s.savePreview(stage,f,'bad'),/32/);
 });
+
+test('Windows ASCII junction renders into Unicode stage and publishes without losing output', {skip:process.platform!=='win32'}, t=>{
+ const dir=root(t),out=path.join(dir,'个站图');fs.mkdirSync(out);const store=createStore(path.join(dir,'config')),stage=store.stage(out);
+ const alias=store.renderDirectory(stage);assert.match(alias,/^[\x00-\x7f]+$/);assert.equal(fs.realpathSync(alias),stage.directory);
+ const image=path.join(alias,'frame.png');fs.writeFileSync(image,png());store.verify(image,{kind:'PNG',alpha:true});
+ const published=store.publish(stage,image,'中文.png','rename');const container=stage.aliasContainer;store.cleanup(stage);
+ assert.ok(fs.existsSync(published.path));assert.equal(fs.existsSync(container),false);assert.equal(fs.existsSync(stage.directory),false);
+});

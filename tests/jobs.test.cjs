@@ -14,3 +14,17 @@ test('Null native output retains recovery journal instead of accessing path',asy
  const r=createRunner(f.bridge,f.store);await assert.rejects(r.preview({projectKey:'p',id:'r'}),/恢复记录/);
  assert.equal(f.writes.at(-1)[1].pending,true);assert.equal(r.isRunning(),false);
 });
+
+test('PNG publishes before copying, requires alpha and keeps saved file on clipboard failure',async()=>{
+ for(const fail of [false,true]){
+ const f=fixture(),events=[];f.store.waitPreview=async()=>events.push('wait');
+ f.store.verify=(p,e)=>{assert.equal(e.alpha,true);assert.equal(e.width,15000);events.push('verify');};
+ f.store.publish=()=>{events.push('publish');return {path:'saved.png'};};
+ f.store.cleanup=()=>events.push('cleanup');
+ f.store.copyPngFile=async p=>{assert.equal(p,'saved.png');events.push('copy');if(fail)throw Error('locked');};
+ const r=createRunner(f.bridge,f.store),work=r.savePng({projectKey:'p',width:15000,height:100},'out','image.png');
+ if(fail)await assert.rejects(work,/PNG 已保存到 saved.png.*locked/);else assert.equal((await work).path,'saved.png');
+ assert.deepEqual(events,['wait','verify','publish','cleanup','copy']);assert.deepEqual(f.calls,['snapshot','directPng']);assert.equal(r.isRunning(),false);
+ }
+});
+test('PNG alpha validation failure never publishes or touches clipboard',async()=>{const f=fixture();let copied=false;f.store.waitPreview=async()=>{};f.store.verify=()=>{throw Error('alpha');};f.store.publish=()=>{throw Error('must not publish');};f.store.copyPngFile=async()=>{copied=true;};const r=createRunner(f.bridge,f.store);await assert.rejects(r.savePng({projectKey:'p'},'out','x.png'),/alpha/);assert.equal(copied,false);assert.equal(r.isRunning(),false);});

@@ -35,6 +35,25 @@
         return { path: previewPath, at: Date.now() };
       } finally { running = false; release(); }
     }
+    async function savePng(record, directory, filename) {
+      if (running) throw new Error('已有任务正在执行。');
+      if (!store.native) throw new Error('请在 AE 2025 内保存 PNG，演示模式不能复制文件。');
+      var release = store.acquireJob ? store.acquireJob() : function () {};
+      running = true;
+      try {
+        status('正在保存原尺寸透明 PNG…');
+        var stage = store.stage(directory);
+        var output = await hostJob('directPng', { record: record, directory: stage.directory }, [record], record.projectKey);
+        await store.waitPreview(stage, output.path);
+        store.verify(output.path, { kind: 'PNG', width: record.width, height: record.height, alpha: true });
+        var published = store.publish(stage, output.path, filename, 'rename');
+        try { store.cleanup(stage); } catch (_) { /* Published file must remain available for pasting. */ }
+        status('PNG 已保存，正在复制文件…');
+        try { await store.copyPngFile(published.path); }
+        catch (error) { throw new Error('PNG 已保存到 ' + published.path + '，但复制失败：' + error.message + '。可在资源管理器中复制此文件。'); }
+        return published;
+      } finally { running = false; release(); }
+    }
     async function batch(plan, options) {
       if (running) throw new Error('已有任务正在执行。');
       if (!store.native) throw new Error('这是界面演示，不能导出文件。请在 AE 2025 内使用插件。');
@@ -45,7 +64,7 @@
       try {
         status('验证输出模板与组合…', 0, plan.length);
         probeStage = store.stage(options.directory);
-        var probe = await hostJob('probe', { records: plan.map(function (j) { return j.record; }), template: profile.name, directory: probeStage.directory }, plan.map(function (j) { return j.record; }), projectKey);
+        var probe = await hostJob('probe', { records: plan.map(function (j) { return j.record; }), template: profile.name, directory: store.renderDirectory ? store.renderDirectory(probeStage) : probeStage.directory }, plan.map(function (j) { return j.record; }), projectKey);
         if (store.normalizeOutput) store.normalizeOutput(probeStage, probe.path, profile);
         store.verify(probe.path, expected(profile, 32, 18));
         store.cleanup(probeStage);
@@ -54,7 +73,7 @@
           var job = plan[i], stage = store.stage(options.directory), completed = null;
           status('正在渲染 ' + job.filename, i, plan.length);
           try {
-            var output = await hostJob('render', { record: job.record, template: profile.name, directory: stage.directory }, [job.record], projectKey);
+            var output = await hostJob('render', { record: job.record, template: profile.name, directory: store.renderDirectory ? store.renderDirectory(stage) : stage.directory }, [job.record], projectKey);
             var normalizedAlpha = store.normalizeOutput ? store.normalizeOutput(stage, output.path, profile) : false;
             store.verify(output.path, expected(profile, job.record.width, job.record.height));
             var published = store.publish(stage, output.path, job.filename, options.conflict);
@@ -78,7 +97,7 @@
         throw error;
       } finally { running = false; release(); }
     }
-    return { preview: preview, batch: batch, stop: function () { stop = true; }, isRunning: function () { return running; } };
+    return { preview: preview, savePng: savePng, batch: batch, stop: function () { stop = true; }, isRunning: function () { return running; } };
   }
   if (typeof window !== 'undefined') window.FrameShelfJobs = { createRunner: createRunner };
   if (typeof module === 'object' && module.exports) module.exports = { createRunner: createRunner };

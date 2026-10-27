@@ -169,6 +169,14 @@
   }
   async function reload() { if (S.jobActive && S.jobActive()) { profiles = S.read('profiles', []); render(); return; } profiles = await B.call('profiles'); S.write('profiles', profiles); render(); }
   async function preview(r) { if (B.demo) { notice('演示模式没有 AE 实际画面。'); return; } if (S.read('recovery:' + r.projectKey, null)) throw new Error('请先处理上次中断任务的恢复记录。');  try { var result = await runner.preview(r); r.previewPath = result.path; r.previewAt = result.at; delete r.previewError; persist(); render(); } catch (e) { r.previewError = e.message; persist(); render(); throw e; } }
+  async function savePng() {
+    if (B.demo) throw new Error('请在 AE 2025 内使用保存 PNG 并复制。');
+    var record = await B.call('capture');
+    var destination = S.pngDestination(record.projectKey);
+    var result = await runner.savePng(record, destination.directory, destination.filename);
+    $('status').textContent = 'PNG 文件已复制 · 可前往微信 / 飞书粘贴';
+    notice('已保存并复制 PNG 文件：' + result.path + '。请粘贴为文件发送，以保留透明通道。');
+  }
   async function capture() { await sync(); var r = await B.call('capture'); if (!session || r.projectKey !== session.projectKey || r.compId !== session.compId) throw new Error('合成已切换，请重新点击添加组合。'); r.id = C.uid(); session.records.push(r); persist(); render(); try { await preview(r); $('status').textContent = '组合已记录，可以继续调整独显并添加'; } catch(e) { notice('组合已记录，预览失败：' + e.message,true); } }
   async function updateCombination(old) {
     if (S.jobActive && S.jobActive()) throw new Error('请等待当前渲染完成。');
@@ -197,6 +205,7 @@
   ['dialog-close', 'dialog-cancel'].forEach(function (id) { $(id).onclick = function () { $('dialog').close(); }; });
   document.querySelectorAll('[data-page]').forEach(function (b) { b.onclick = guard(function () { page(b.dataset.page); }); });
   $('edit-output-template').onclick = guard(async function () { if (B.demo) { notice('请在 AE 中打开原生输出模块模板窗口。'); return; } if (S.jobActive && S.jobActive()) throw new Error('请等待渲染完成后修改模板。'); var release = S.acquireJob ? S.acquireJob() : function () {}; try { await B.call('editOutputTemplates'); } finally { release(); } await reload(); notice('模板列表已刷新'); });
+  $('save-png-copy').onclick = guard(savePng);
   ['add-record', 'empty-add'].forEach(function (id) { $(id).onclick = guard(capture); }); $('export-button').onclick = guard(exportWindow ? review : openExport); $('export-top').onclick = guard(openExport);
   $('sync-project').onclick = guard(sync); $('reload-profiles').onclick = guard(reload); $('search').oninput = render;
   $('refresh-previews').onclick = guard(async function () { for (var i = 0; i < session.records.length; i++) await preview(session.records[i]); });

@@ -1,5 +1,6 @@
 /* Frame Shelf: AE 25.x / ExtendScript ES3. All mutation stays in this adapter. */
 var FrameShelf = (function () {
+    var diagnostics = null;
     function encode(v) {
         if (v === null || v === undefined) { return "null"; }
         if (typeof v === "string") { return '"' + v.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\x00-\x1f\u2028\u2029]/g, function (c) { return "\\u" + ("0000" + c.charCodeAt(0).toString(16)).slice(-4); }) + '"'; }
@@ -194,8 +195,18 @@ var FrameShelf = (function () {
         if (settings.Resize === "true" || settings.Crop === "true") { throw new Error("当前模板启用了缩放或裁切；本工具按合成原尺寸导出，请在 AE 模板中关闭 Resize/Crop。"); }
         om.postRenderAction = PostRenderAction.NONE;
         var folder = new Folder(args.directory);
+        diagnostics = { aeVersion: app.version, os: typeof $ !== "undefined" ? $.os : "unknown", requestedDirectory: args.directory, folderNative: folder.fsName, folderURI: folder.absoluteURI || null, folderExists: folder.exists, template: args.template, format: p.kind };
+
         if (!folder.exists) { throw new Error("本次临时输出目录不存在。"); }
-        om.file = new File(folder.fsName + "/frame_[#####]" + p.ext);
+        // URI keeps Unicode and literal percent characters unambiguous for File parsing.
+        var outputFile = new File((folder.absoluteURI || folder.fsName) + "/frame_[#####]" + p.ext);
+        diagnostics.requestedOutput = outputFile.fsName;
+        om.file = outputFile;
+        var assignedFile = item.outputModule(1).file;
+        diagnostics.assignedOutput = assignedFile ? assignedFile.fsName : null;
+        diagnostics.assignedURI = assignedFile ? assignedFile.absoluteURI : null;
+        diagnostics.assignedParentExists = assignedFile && assignedFile.parent ? assignedFile.parent.exists : null;
+        if (!assignedFile || assignedFile.fsName !== outputFile.fsName) { throw new Error("AE 输出模块回读路径与请求不一致，已停止渲染。请提供 %APPDATA%/FrameShelf/logs 中的诊断日志。"); }
         if (Math.abs(item.timeSpanStart - targetTime) > 0.0000001 || Math.abs(item.timeSpanDuration - comp.frameDuration) > 0.0000001) { throw new Error("AE 单帧范围校验失败：start=" + item.timeSpanStart + ", duration=" + item.timeSpanDuration + ", expected=" + targetTime + "/" + comp.frameDuration); }
         return { profile: p, factor: factor };
     }
@@ -210,13 +221,13 @@ var FrameShelf = (function () {
         if (images.length !== 1 || images[0].length === 0) { throw new Error("单帧任务输出数量异常：" + images.length + " 张；范围 " + item.timeSpanStart + " / " + item.timeSpanDuration + " 秒；目录 " + args.directory); }
         return { path: images[0].fsName, profile: configured.profile, factor: configured.factor, width: comp.width, height: comp.height };
     }
-    function directPreview(args) {
+    function directPreview(args, fullSize) {
         permission(); var c = checkedComp(args.record), saved = layerStates(c), resolution = c.resolutionFactor;
         var file = new File(args.directory + "/preview.png"), error = null, errors = [];
         if (!(new Folder(args.directory)).exists) { throw new Error("预览临时目录不存在。"); }
         try {
             apply(c, args.record.layers);
-            var factor = Math.max(1, Math.ceil(Math.max(c.width, c.height) / 960));
+            var factor = fullSize ? 1 : Math.max(1, Math.ceil(Math.max(c.width, c.height) / 960));
             c.resolutionFactor = [factor, factor];
             c.saveFrameToPng(args.record.frameIndex * c.frameDuration, file);
             // AE may finish writing after this script returns; Node waits for a complete PNG.
@@ -247,7 +258,7 @@ var FrameShelf = (function () {
             });
         });
     }
-    var methods = { info: info, capture: capture, profiles: profiles, snapshot: snapshot, recover: recover, render: render, directPreview: directPreview, probe: probe,
+    var methods = { info: info, capture: capture, profiles: profiles, snapshot: snapshot, recover: recover, render: render, directPreview: directPreview, directPng: function (args) { return directPreview(args, true); }, probe: probe,
         validate: function (args) { for (var i = 0; i < args.records.length; i++) { checkedComp(args.records[i]); } return info(); },
         chooseFolder: function () { var f = Folder.selectDialog("选择批量导出文件夹"); return f ? f.fsName : null; },
         openFolder: function (args) { var f = new Folder(args.path); if (!f.exists) { throw new Error("文件夹不存在。"); } return f.execute(); },
@@ -261,7 +272,8 @@ var FrameShelf = (function () {
         showQueue: function () { app.project.renderQueue.showWindow(true); return true; }
     };
     return { stringify: encode, dispatch: function (method, json) {
-        try { if (!methods.hasOwnProperty(method)) { throw new Error("未知操作。"); } return encode({ ok: true, data: methods[method](decode(json || "{}")) }); }
-        catch (e) { return encode({ ok: false, error: String(e.message || e), line: e.line || null, needsRecovery: !!e.needsRecovery, cancelled: !!e.cancelled }); }
+        diagnostics = null;
+        try { if (!methods.hasOwnProperty(method)) { throw new Error("未知操作。"); } return encode({ ok: true, data: methods[method](decode(json || "{}")), diagnostics: diagnostics }); }
+        catch (e) { return encode({ ok: false, error: String(e.message || e), line: e.line || null, needsRecovery: !!e.needsRecovery, cancelled: !!e.cancelled, diagnostics: diagnostics }); }
     } };
 }());

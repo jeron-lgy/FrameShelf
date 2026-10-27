@@ -12,9 +12,14 @@
     });
     if (!demo) return new Promise(function (resolve, reject) {
       var script = 'FrameShelf.dispatch(' + JSON.stringify(method) + ',' + JSON.stringify(JSON.stringify(args || {})) + ')';
+      // Keep the CEP transport ASCII-only; ExtendScript decodes Unicode escapes.
+      script = script.replace(/[\u007f-\uffff]/g, function (c) { return '\\u' + ('0000' + c.charCodeAt(0).toString(16)).slice(-4); });
       window.__adobe_cep__.evalScript(script, function (raw) {
         try {
           var result = JSON.parse(raw);
+          if (result.diagnostics && window.FrameShelfStorage && window.FrameShelfStorage.logDiagnostic) {
+            window.FrameShelfStorage.logDiagnostic({ method: method, directory: args && args.directory, template: args && args.template, ok: result.ok, error: result.error, host: result.diagnostics });
+          }
           if (!result.ok) { var error = new Error(result.error + (result.line ? '（脚本行 ' + result.line + '）' : '')); error.needsRecovery = result.needsRecovery; error.cancelled = result.cancelled; throw error; }
           resolve(result.data);
         } catch (error) { reject(raw === 'EvalScript error.' ? new Error('AE 脚本未加载，请重开面板。') : error); }

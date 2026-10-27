@@ -59,10 +59,37 @@ function createStore(root) {
     if (file && (path.dirname(fs.realpathSync(file)) !== real || fs.lstatSync(file).isSymbolicLink())) throw new Error('输出文件不在本次临时目录内。');
     return real;
   }
+  function renderDirectory(job) {
+    assertStage(job);
+    if (process.platform !== 'win32' || !/[^\x00-\x7f]/.test(job.directory)) return job.directory;
+    if (job.alias) return job.alias;
+    const candidates = [require('os').tmpdir(), path.join(path.parse(job.directory).root, 'FrameShelfTemp')];
+    let failure;
+    for (const base of candidates) {
+      if (/[^\x00-\x7f]/.test(base)) continue;
+      try {
+        fs.mkdirSync(base, { recursive: true });
+        const container = fs.mkdtempSync(path.join(base, 'frameshelf-'));
+        const alias = path.join(container, 'output');
+        fs.symlinkSync(job.directory, alias, 'junction');
+        if (fs.realpathSync(alias) !== job.directory) throw new Error('目录入口目标校验失败');
+        job.alias = alias;
+        job.aliasContainer = container;
+        logDiagnostic({ event: 'render-path-alias', directory: job.directory, renderDirectory: alias });
+        return alias;
+      } catch (error) { failure = error; }
+    }
+    throw new Error('无法创建英文渲染路径入口，请暂用纯英文输出目录。' + (failure ? failure.message : ''));
+  }
   function cleanup(job) {
     const real = assertStage(job);
     for (const entry of fs.readdirSync(real, { withFileTypes: true })) if (!entry.isFile()) throw new Error('临时目录中出现意外子目录，已保留供检查。');
     for (const name of fs.readdirSync(real)) fs.unlinkSync(path.join(real, name));
+    if (job.alias) {
+      if (path.dirname(job.alias) !== job.aliasContainer || path.basename(job.alias) !== 'output' || !fs.lstatSync(job.alias).isSymbolicLink() || fs.realpathSync(job.alias) !== real) throw new Error('渲染目录入口归属不符，已保留。');
+      fs.unlinkSync(job.alias);
+      fs.rmdirSync(job.aliasContainer);
+    }
     fs.rmdirSync(real);
   }
   function publish(job, source, filename, policy) {
@@ -127,13 +154,33 @@ function createStore(root) {
     if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) throw new Error('文件夹不存在，请检查路径。');
     return path.normalize(directory);
   }
+  function logDiagnostic(entry) {
+    // Diagnostic failures must never change a completed render into a failed job.
+    try {
+      const directory = path.join(root, 'logs');
+      fs.mkdirSync(directory, { recursive: true });
+      const day = new Date().toISOString().slice(0, 10);
+      const data = Object.assign({ at: new Date().toISOString(), plugin: '0.9.3', node: process.version, platform: process.platform, windows: require('os').release() }, entry);
+      if (entry.directory) data.nodeDirectoryExists = fs.existsSync(entry.directory);
+      fs.appendFileSync(path.join(directory, 'render-' + day + '.jsonl'), JSON.stringify(data) + '\n', 'utf8');
+    } catch (_) { /* Best-effort diagnostics. */ }
+  }
+  function pngDestination(projectFile, now = new Date()) {
+    if (!projectFile || !path.isAbsolute(projectFile) || !fs.existsSync(projectFile)) throw new Error('请先保存 AE 工程，再保存 PNG。');
+    const directory = path.join(path.dirname(projectFile), 'FrameShelf PNG');
+    fs.mkdirSync(directory, { recursive: true });
+    const projectName = path.basename(projectFile, path.extname(projectFile));
+    const pad = n => String(n).padStart(2, '0');
+    const filename = projectName + '_' + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + '.png';
+    return { directory, filename };
+  }
   function imageUrl(file) {
     if (!file || !fs.existsSync(file)) return '';
     const real = fs.realpathSync(file), previewRoot = fs.realpathSync(path.join(root, 'previews'));
     if (path.dirname(real) !== previewRoot || fs.statSync(real).size > 16 * 1024 * 1024) return '';
     return 'data:image/png;base64,' + fs.readFileSync(real).toString('base64');
   }
-  return { root, native: true, read, write, stage, cleanup, publish, availableNames, validateDirectory, waitPreview, savePreview, imageUrl, verify: images.verify,
+  return { renderDirectory, logDiagnostic, pngDestination, copyPngFile: require('./clipboard.cjs').copyPngFile, root, native: true, read, write, stage, cleanup, publish, availableNames, validateDirectory, waitPreview, savePreview, imageUrl, verify: images.verify,
     normalizeOutput: (job, file, profile) => { assertStage(job, file); return images.normalizeTiffAlpha(file, profile); },
     withStateLock, acquireJob: () => acquireLock('render'), jobActive: () => activeLock('render') };
 }

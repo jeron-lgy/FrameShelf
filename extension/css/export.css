@@ -64,3 +64,13 @@
 /* Version remains visible in both capture and naming panels, including narrow layouts. */
 .status-line #status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .status-line #version,.export-window .status-line #version{display:inline-block;flex:none;white-space:nowrap;font-size:11px;letter-spacing:0;color:#aebbc7;margin-left:12px}
+
+/* Icon-only capture toolbar with distinct primary actions. */
+.capture-window .toolbar{height:65px;min-height:65px;gap:8px;padding:0 10px}
+.capture-window .tools{gap:8px;flex-wrap:nowrap}
+.capture-window .tools .tool{width:42px;height:40px;padding:0;min-width:40px;border:1px solid transparent;border-radius:6px}
+.capture-window #add-record{background:#107eaa;border-color:#35b8eb;color:#fff}
+.capture-window #add-record:hover:not(:disabled){background:#1597c7}
+.capture-window #save-png-copy{background:#28664f;border-color:#4b9e7c;color:#e0fff1}
+.capture-window #save-png-copy:hover:not(:disabled){background:#328263}
+@media(max-width:580px){.capture-window .tools{gap:6px}.capture-window .tool-divider{margin:0 2px}}
