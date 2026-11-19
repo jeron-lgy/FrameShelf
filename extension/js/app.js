@@ -221,6 +221,7 @@
   async function reload() { if (S.jobActive && S.jobActive()) { profiles = S.read('profiles', []); render(); return; } profiles = await B.call('profiles'); S.write('profiles', profiles); render(); }
   async function preview(r) { if (B.demo) { notice('演示模式没有 AE 实际画面。'); return; } if (S.read('recovery:' + r.projectKey, null)) throw new Error('请先处理上次中断任务的恢复记录。');  try { var result = await runner.preview(r); r.previewPath = result.path; r.previewAt = result.at; delete r.previewError; persist(); render(); } catch (e) { r.previewError = e.message; persist(); render(); throw e; } }
   var namedKey, namedPhotos;
+  var allNamedSlots = false, namedProject, expandedGroups = new Map();
   function loadNamedPhotos(key) {
     var photos = S.read('photos:' + key, null);
     if (photos) return photos;
@@ -244,23 +245,33 @@
       });
       persist();
     }
+    Object.assign(photos, S.read('pending-photos:' + key, {}));
     S.write('photos:' + key, photos);
     return photos;
   }
-  async function saveNamed(key, slot) {
+  async function saveNamed(owner, slot, sourceId) {
     if (B.demo) throw new Error('请在 AE 中保存当前帧。');
     var record = await B.call('capture');
-    if (key !== 'named:' + C.sessionKey(record.projectKey, record.compId)) {
+    if (owner.projectKey !== record.projectKey || sourceId !== record.compId) {
       await sync(); throw new Error('当前合成已切换，请在对应占位上重新保存。');
     }
-    var latest = S.read(C.sessionKey(record.projectKey, record.compId), session);
-    var current = latest.slots.find(function (entry) { return entry.id === slot.id; });
+    var ownerKey = C.sessionKey(owner.projectKey, owner.compId);
+    var key = 'named:' + ownerKey;
+    var latest = S.read(ownerKey, null);
+    var current = latest && latest.slots.find(function (entry) { return entry.id === slot.id; });
     if (!current) throw new Error('占位已移除，请刷新后再保存。');
     var filename = C.slotFilename(latest, current) + '.png';
     var destination = S.pngDestination(record.projectKey);
     var result = await runner.savePng(record, destination.directory, filename, true);
-    namedPhotos[slot.id] = {lastFile:result.filename, path:result.path, frame:record.displayFrame, thumbnail:result.thumbnail};
-    S.write('photos:' + key, namedPhotos);
+    var photosKey = 'photos:' + key, photos = S.read(photosKey, null);
+    if (!photos) {
+      photosKey = 'pending-photos:' + key;
+      photos = S.read(photosKey, {});
+    }
+    photos[slot.id] = {lastFile:result.filename, path:result.path, frame:record.displayFrame,
+      sourceName:record.compName, sourceId:record.compId, thumbnail:result.thumbnail};
+    S.write(photosKey, photos);
+    if (key === namedKey) namedPhotos = photos;
     drawNamed();
     notice('已保存：' + result.path);
   }
@@ -292,19 +303,68 @@
     $('named-controls').hidden = !available;
     $('named-add').hidden = !available;
     $('named-comp').hidden = available;
+    $('named-scope').hidden = !available;
     if (!available) { namedKey = null; return; }
+    if (namedProject !== session.projectKey) {
+      namedProject = session.projectKey;
+      allNamedSlots = false;
+      expandedGroups.clear();
+      $('named-filter').value = '';
+    }
+    $('named-all').checked = allNamedSlots;
+    $('named-filter').hidden = !allNamedSlots;
+    grid.classList.toggle('named-groups', allNamedSlots);
     var key = 'named:' + C.sessionKey(session.projectKey, session.compId);
-    if (key !== namedKey) { namedKey = key; namedPhotos = {}; namedPhotos = loadNamedPhotos(key); }
-    session.slots.forEach(function (slot) {
-      var photo = namedPhotos[slot.id] || {};
+    if (key !== namedKey) { expandedGroups.clear(); namedKey = key; namedPhotos = {}; namedPhotos = loadNamedPhotos(key); }
+    if (!allNamedSlots) {
+      session.slots.forEach(function (slot) { drawNamedCard(grid, session, slot, namedPhotos, session.compId); });
+      return;
+    }
+    var others = S.compositionSessions(session.projectKey).filter(function (owner) {
+      return owner.compId !== session.compId && owner.slots.length;
+    }).sort(function (a,b) { return String(a.compName).localeCompare(String(b.compName)) || a.compId-b.compId; });
+    var sourceId = session.compId;
+    var query = $('named-filter').value.trim().toLowerCase();
+    var owners = [session].concat(others);
+    owners.forEach(function (owner) {
+      var title = owner.compName || ('合成 #' + owner.compId);
+      var sameName = owners.some(function (o) { return o !== owner && o.compName === owner.compName; });
+      if (sameName) title += ' #' + owner.compId;
+      var slots = owner.slots.filter(function (slot) {
+        return title.toLowerCase().includes(query) || slotLabel(owner, slot).toLowerCase().includes(query);
+      });
+      if (!slots.length) return;
+      var local = owner.compId === sourceId;
+      var group = node('details', null, 'named-group'), cards = node('div', null, 'named-group-cards');
+      group.open = !!query || (expandedGroups.has(owner.compId) ? expandedGroups.get(owner.compId) : local);
+      group.append(node('summary', title + (local ? ' · 当前取帧' : '') + ' (' + slots.length + ')'), cards);
+      function fill() {
+        if (!group.open || cards.childElementCount) return;
+        var photoKey = 'named:' + C.sessionKey(owner.projectKey, owner.compId);
+        var photos = local ? namedPhotos : S.read('photos:' + photoKey, null) || S.read('pending-photos:' + photoKey, {});
+        slots.forEach(function (slot) { drawNamedCard(cards, owner, slot, photos, sourceId); });
+      }
+      group.ontoggle = function (e) {
+        if (!group.isConnected || e.target !== group) return;
+        if (!query) expandedGroups.set(owner.compId, group.open);
+        fill();
+      };
+      grid.append(group); fill();
+    });
+    if (!grid.childElementCount) grid.append(node('p', query ? '没有匹配的图槽。' : '当前工程还没有图槽。', 'muted'));
+  }
+  function slotLabel(owner, slot) {
+    try { return C.slotFilename(owner, slot) + '.png'; } catch (err) { return err.message; }
+  }
+  function drawNamedCard(grid, owner, slot, photos, sourceId) {
+      var photo = photos[slot.id] || {};
       var card = node('article', null, 'named-card');
-      var save = button('', function () { return saveNamed(key, slot); });
+      var save = button('', function () { return saveNamed(owner, slot, sourceId); });
       save.className = 'named-save';
       var visual = node('span', null, 'named-visual');
       if (photo.thumbnail) { var img = node('img'); img.src = photo.thumbnail; img.alt = ''; visual.append(img); }
       else visual.append(node('span', '＋ 保存当前帧'));
-      var label;
-      try { label = C.slotFilename(session, slot) + '.png'; } catch (err) { label = err.message; }
+      var label = slotLabel(owner, slot);
       save.title = '保存当前帧 · ' + label;
       save.append(visual, node('strong', label));
       var actions = node('div', null, 'record-actions');
@@ -314,12 +374,16 @@
       }));
       card.append(save);
       if (photo.lastFile) {
-        var last = node('small', '帧 ' + photo.frame + ' · ' + photo.lastFile);
+        var last = node('small', '上次取自：' + (photo.sourceName || owner.compName) + ' · 帧 ' + photo.frame + ' · ' + photo.lastFile);
         last.title = photo.path; card.append(last);
       }
-      card.append(actions); grid.append(card);
-    });
+      if (owner.compId === sourceId) card.append(actions);
+      grid.append(card);
   }
+  $('named-all').onchange = function () {
+    allNamedSlots = this.checked; expandedGroups.clear(); $('named-filter').value = ''; drawNamed();
+  };
+  $('named-filter').oninput = drawNamed;
   $('named-add').onclick = guard(function () { editNamed({id: C.uid(), pattern: '新名称', values: {}, selected:true, recordId:null}); });
   async function savePng() {
     if (B.demo) throw new Error('请在 AE 2025 内使用保存 PNG 并复制。');
