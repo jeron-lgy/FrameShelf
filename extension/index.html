@@ -34,6 +34,7 @@
         <button id="save-options" aria-label="保存选项" aria-expanded="false" aria-controls="save-menu">▾</button>
         <div id="save-menu" hidden>
           <button id="normal-save">正常保存</button>
+          <button data-page="named">按名称保存…</button>
           <button id="queue-png">完美保存…</button>
           <button id="queue-template">设置默认模板…</button>
         </div>
@@ -45,6 +46,7 @@
   </header>
   <nav class="tabs" aria-label="面板视图">
     <button class="tab active" data-page="workspace">组合库 <span id="record-count">0</span></button>
+    <button class="tab named-entry" data-page="named">命名保存</button>
     <button class="tab" data-page="history">导出记录 <span id="history-count">0</span></button>
     <div class="host-indicator"><i id="host-dot"></i><span id="host-label">连接 AE…</span></div>
   </nav>
@@ -53,6 +55,12 @@
   <div id="demo-banner" class="banner" hidden>界面演示 · 不会操作 AE 或导出文件 <button id="load-demo">载入示例组合</button></div>
   <div id="recovery-banner" class="banner warning" hidden>上次任务意外中断，请检查组合开关和渲染队列。<button id="recover">恢复任务前状态</button><button id="dismiss-recovery">已手动检查</button></div>
   <div id="notice" role="status" aria-live="polite" hidden></div>
+  <section id="named" class="page named-page" hidden>
+    <header class="section-heading"><h1>命名保存</h1><button id="named-add" class="secondary">＋ 名称占位</button></header>
+    <p id="named-comp" class="muted"></p>
+    <div id="named-controls"><select id="named-preset" aria-label="命名预设"></select><button id="named-import" class="secondary">套用命名</button></div>
+    <div id="named-grid"></div>
+  </section>
   <main id="workspace" class="workspace page">
     <section class="library">
       <div class="section-heading"><div><p class="eyebrow">COMPOSITION VARIANTS</p><h1>你的组合库</h1></div><span class="pill" id="project-bits">—</span></div>
@@ -88,7 +96,7 @@
     <button id="export-button" class="primary export-button"><svg><use href="#i-export"/></svg><span>检查并导出</span><b id="export-count">0</b></button>
     <button id="stop-button" class="secondary" hidden>当前帧后停止</button>
   </footer>
-  <div class="status-line"><span id="status">准备就绪</span><span id="version">v0.10.0</span></div>
+  <div class="status-line"><span id="status">准备就绪</span><span id="version">v0.11.0</span></div>
   <div id="progress-track" class="progress-track" hidden><div id="progress-fill"></div></div>
   <dialog id="dialog"><form id="dialog-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="dialog-close" class="icon-button" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div><div id="dialog-content"></div><div class="dialog-actions"><button type="button" id="dialog-cancel" class="secondary">取消</button><button type="submit" id="dialog-submit" class="primary">保存</button></div></form></dialog>
   <script src="js/core.js"></script><script src="js/storage.js"></script><script src="js/bridge.js"></script><script src="js/jobs.js"></script><script src="js/text-input.js"></script><script src="js/app.js"></script>

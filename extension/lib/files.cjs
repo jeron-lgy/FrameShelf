@@ -160,7 +160,7 @@ function createStore(root) {
       const directory = path.join(root, 'logs');
       fs.mkdirSync(directory, { recursive: true });
       const day = new Date().toISOString().slice(0, 10);
-      const data = Object.assign({ at: new Date().toISOString(), plugin: '0.10.0', node: process.version, platform: process.platform, windows: require('os').release() }, entry);
+      const data = Object.assign({ at: new Date().toISOString(), plugin: '0.11.0', node: process.version, platform: process.platform, windows: require('os').release() }, entry);
       if (entry.directory) data.nodeDirectoryExists = fs.existsSync(entry.directory);
       fs.appendFileSync(path.join(directory, 'render-' + day + '.jsonl'), JSON.stringify(data) + '\n', 'utf8');
     } catch (_) { /* Best-effort diagnostics. */ }
@@ -198,16 +198,21 @@ function createStore(root) {
     if (path.dirname(real) !== previewRoot || fs.statSync(real).size > 16 * 1024 * 1024) return '';
     return 'data:image/png;base64,' + fs.readFileSync(real).toString('base64');
   }
-  async function straightPng(stage, file) {
+  async function straightPng(stage, file, thumbnail) {
     assertStage(stage, file);
     const target = path.join(stage.directory, 'straight.png');
     const exe = path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe');
     await require('util').promisify(require('child_process').execFile)(exe,
       ['-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'straight-png.ps1')],
-      {windowsHide:true, env:Object.assign({}, process.env, {FRAMESHELF_INPUT:file, FRAMESHELF_OUTPUT:target})});
+      {windowsHide:true, env:Object.assign({}, process.env, {FRAMESHELF_INPUT:file, FRAMESHELF_OUTPUT:target, FRAMESHELF_THUMB:thumbnail ? path.join(stage.directory, 'slot.png') : ''})});
     return target;
   }
-  return { compositionSessions, straightPng, renderDirectory, logDiagnostic, pngDestination, copyPngFile: require('./clipboard.cjs').copyPngFile, root, native: true, read, write, stage, cleanup, publish, availableNames, validateDirectory, waitPreview, savePreview, imageUrl, verify: images.verify,
+  function readSlotThumbnail(stage) {
+    const file = path.join(stage.directory, 'slot.png');
+    assertStage(stage, file);
+    return 'data:image/png;base64,' + fs.readFileSync(file).toString('base64');
+  }
+  return { compositionSessions, readSlotThumbnail, straightPng, renderDirectory, logDiagnostic, pngDestination, copyPngFile: require('./clipboard.cjs').copyPngFile, root, native: true, read, write, stage, cleanup, publish, availableNames, validateDirectory, waitPreview, savePreview, imageUrl, verify: images.verify,
     normalizeOutput: (job, file, profile) => { assertStage(job, file); return images.normalizeTiffAlpha(file, profile); },
     withStateLock, acquireJob: () => acquireLock('render'), jobActive: () => activeLock('render') };
 }

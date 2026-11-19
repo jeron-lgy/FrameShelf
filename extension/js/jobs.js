@@ -35,7 +35,7 @@
         return { path: previewPath, at: Date.now() };
       } finally { running = false; release(); }
     }
-    async function savePng(record, directory, filename) {
+    async function savePng(record, directory, filename, named) {
       if (running) throw new Error('已有任务正在执行。');
       if (!store.native) throw new Error('请在 AE 2025 内保存 PNG，演示模式不能复制文件。');
       var release = store.acquireJob ? store.acquireJob() : function () {};
@@ -46,10 +46,15 @@
         var output = await hostJob('directPng', { record: record, directory: stage.directory }, [record], record.projectKey);
         await store.waitPreview(stage, output.path);
         var sourceInfo = store.verify(output.path, { kind: 'PNG', width: record.width, height: record.height, alpha: true });
-        var corrected = await store.straightPng(stage, output.path);
+        var corrected = await store.straightPng(stage, output.path, named);
         store.verify(corrected, { kind: 'PNG', width: record.width, height: record.height, bits: sourceInfo.bits, alpha: true });
         var published = store.publish(stage, corrected, filename, 'rename');
+        if (named) {
+          try { published.thumbnail = store.readSlotThumbnail(stage); }
+          catch (_) { published.thumbnail = ''; }
+        }
         try { store.cleanup(stage); } catch (_) { /* Published file must remain available for pasting. */ }
+        if (named) return published;
         status('PNG 已保存，正在复制文件…');
         try { await store.copyPngFile(published.path); }
         catch (error) { throw new Error('PNG 已保存到 ' + published.path + '，但复制失败：' + error.message + '。可在资源管理器中复制此文件。'); }

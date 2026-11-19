@@ -48,6 +48,14 @@ public static class FrameShelfPng {
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(bitmap, null, null, source.ColorContexts));
             using (var dest = new FileStream(output, FileMode.CreateNew)) encoder.Save(dest);
+            string thumb = Environment.GetEnvironmentVariable("FRAMESHELF_THUMB");
+            if (!String.IsNullOrEmpty(thumb)) {
+                double scale = Math.Min(1.0, 240.0 / Math.Max(width, height));
+                var small = new TransformedBitmap(bitmap, new ScaleTransform(scale, scale));
+                var png = new PngBitmapEncoder();
+                png.Frames.Add(BitmapFrame.Create(small));
+                using (var dest = new FileStream(thumb, FileMode.CreateNew)) png.Save(dest);
+            }
         }
     }
 }
