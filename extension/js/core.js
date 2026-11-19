@@ -69,7 +69,7 @@
   function applyPreset(session, preset) {
     session.presetId = preset.id;
     session.fields = Object.assign({}, preset.fields || {});
-    session.slots = preset.slots.map(function (name,i) { return { id: uid(), pattern: name, recordId: null, selected: true, values: Object.assign({},preset.values && preset.values[i] || {}) }; });
+    session.slots = preset.slots.map(function (name,i) { return { id: uid(), pattern: name, filenameOverride: (preset.overrides || [])[i] || undefined, recordId: null, selected: true, values: Object.assign({},preset.values && preset.values[i] || {}) }; });
     delete session.naming; if (preset.naming) { session.naming = JSON.parse(JSON.stringify(preset.naming)); session.product = preset.product || ''; }
   }
   function buildPlan(session, profile) {
@@ -125,6 +125,7 @@
     }
   }
   function slotFilename(session, slot, date) {
+    if (slot.filenameOverride) return filename(slot.filenameOverride, session.product, { fields: session.fields, date: date });
     if (!session.naming) return filename(slot.pattern, session.product, { fields: session.fields, date: date });
     if (typeof session.naming.separator !== 'string' || session.naming.separator.length > 10) throw new Error('字段分隔符最多 10 个字符');
     var parts = session.naming.fields.map(function (f) {
@@ -141,7 +142,7 @@
     if(index<0) return;
     var field=fields.splice(index,1)[0]; fields.splice(Math.max(0,Math.min(fields.length,targetIndex)),0,field);
   }
-  function namingPreset(session, id, name) { return { id:id, name:name, slots:session.slots.map(function(s){return s.pattern;}), fields:Object.assign({},session.fields||{}), product:session.product, naming:JSON.parse(JSON.stringify(session.naming)), values:session.slots.map(function(s){return Object.assign({},s.values||{});}) }; }
+  function namingPreset(session, id, name) { return { id:id, name:name, overrides:session.slots.map(function(s){return s.filenameOverride || null;}), slots:session.slots.map(function(s){return s.pattern;}), fields:Object.assign({},session.fields||{}), product:session.product, naming:JSON.parse(JSON.stringify(session.naming)), values:session.slots.map(function(s){return Object.assign({},s.values||{});}) }; }
   function addField(session, name, value, targetId) {
     name = String(name || '').trim(); value = String(value || '').trim();
     if (!name || /[{}$]/.test(name) || ['产品名','__proto__','constructor','prototype'].indexOf(name) >= 0) throw new Error('字段名称无效或保留');

@@ -15,15 +15,40 @@
   function notice(text, error) { clearTimeout(noticeTimer); if (text && !error) noticeTimer = setTimeout(function () { $('notice').hidden = true; }, 4500); $('notice').hidden = !text; $('notice').textContent = text || ''; $('notice').className = error ? 'warning' : ''; }
   function guard(fn) { return async function (event) { if (busy) return; lock(true); try { await fn(event); } catch (e) { notice(e.message, true); checkRecovery(); } finally { lock(false); } }; }
   function persistUnlocked() {
-    if (exportWindow) S.write('config', config);
-    else { var current = S.read('config', null); if (!current) S.write('config', config); else { if (!current.settings.previewTemplate && config.settings.previewTemplate) { current.settings.previewTemplate = config.settings.previewTemplate; S.write('config', current); } config = current; } }
+    var latestConfig = S.read('config', null);
+    if (configBase && JSON.stringify(config) !== configBase) {
+      if (latestConfig && JSON.stringify(latestConfig) !== configBase) {
+        config = latestConfig; rememberConfig(); render();
+        throw new Error('另一面板刚修改了配置，已刷新，请重新编辑。');
+      }
+      S.write('config', config);
+    } else if (latestConfig) config = latestConfig;
+    rememberConfig();
     if (session && session.scope === 'project') {
       refreshProject(session);
       S.write(C.projectSessionKey(session.projectKey), Object.assign({}, session, { records: [] }));
       return;
     }
-    if (session && session.compId != null) { session = C.mergeSession(session, S.read(C.sessionKey(session.projectKey, session.compId), null), exportWindow ? 'export' : 'capture'); S.write(C.sessionKey(session.projectKey, session.compId), session); }
+    if (session && session.compId != null) {
+      var key = C.sessionKey(session.projectKey, session.compId);
+      C.ensureNaming(session);
+      var stored = S.read(key, session);
+      var edited = nameState(session) !== namingBase;
+      if (edited && nameState(stored) !== namingBase) {
+        session = stored; namingBase = nameState(session); render();
+        throw new Error('另一面板刚修改了此合成的卡槽或命名，已刷新，请重新编辑。');
+      }
+      var merged = C.mergeSession(session, stored, exportWindow ? 'export' : 'capture');
+      var names = edited ? session : stored;
+      ['naming','slots','product','fields','presetId'].forEach(function (k) { merged[k] = names[k]; });
+      var valid = new Set(merged.records.map(function (r) { return r.id; }));
+      merged.slots.forEach(function (slot) { if (!valid.has(slot.recordId)) slot.recordId = null; });
+      session = merged; S.write(key, merged); namingBase = nameState(merged);
+    }
   }
+  var namingBase, configBase;
+  function rememberConfig() { configBase = JSON.stringify(config); }
+  function nameState(model) { return JSON.stringify([model.naming,model.slots,model.product,model.fields,model.presetId]); }
   function persist() { return S.withStateLock ? S.withStateLock(persistUnlocked) : persistUnlocked(); }
   function openExport() {
     if (exportWindow) { page('board'); return; }
@@ -69,6 +94,9 @@
         var label=node('label',f.label), input=node('input'); input.value=(s.values||{})[f.id]||'';input.setAttribute('aria-label',f.label+' · 输出 '+(session.slots.indexOf(s)+1));
         bindText(input,function(){var current=session.slots.find(function(x){return x.id===s.id;});current.values=current.values||{};current.values[f.id]=input.value;persist();updateNames();});label.append(input);inputs.append(label);
       });
+      if (s.filenameOverride || !session.naming.fields.some(function(f){return f.type==='custom';})) {
+        inputs.append(button('编辑独立文件名', function () { editNamed(s); }));
+      }
       var r = session.records.find(function (r) { return r.id === s.recordId; });
       var visual = button('', function () { if (!picked) { notice('先点选左侧组合，或把组合拖入此卡片。'); return; } C.assign(session, s.id, picked); persist(); render(); });
       visual.className = 'assignment-visual'; visual.setAttribute('aria-label', '分配组合到 ' + s.pattern); visual.append(r ? image(r) : node('span', '拖入组合 / 点击分配', 'drop-hint'));
@@ -130,6 +158,7 @@
     $('field-separator').value=session.naming.separator;
   }
   function updateNames() {
+    if (!exportWindow && !$('named').hidden) drawNamed();
     document.querySelectorAll('#board-targets .target').forEach(function (card) {
       var slot = session.slots.find(function (s) { return s.id === card.dataset.id; });
       if (!slot) return;
@@ -173,9 +202,10 @@
       var read = function () {
         var key = C.sessionKey(info.projectKey, info.compId), saved = S.read(key, null);
         if (!saved) { saved = C.compositionSession(info.projectKey, info.compId, info.compName, S.read('session:' + info.projectKey, null), config.presets[0]); S.write(key, saved); }
+        if (!saved.naming) { C.ensureNaming(saved); S.write(key, saved); }
         return saved;
       };
-      session = S.withStateLock ? S.withStateLock(read) : read();
+      session = S.withStateLock ? S.withStateLock(read) : read(); namingBase = nameState(session);
       picked = null; activeSlot = null; $('search').value = '';
     }
     session.compName = info.compName;
@@ -190,49 +220,69 @@
   }
   async function reload() { if (S.jobActive && S.jobActive()) { profiles = S.read('profiles', []); render(); return; } profiles = await B.call('profiles'); S.write('profiles', profiles); render(); }
   async function preview(r) { if (B.demo) { notice('演示模式没有 AE 实际画面。'); return; } if (S.read('recovery:' + r.projectKey, null)) throw new Error('请先处理上次中断任务的恢复记录。');  try { var result = await runner.preview(r); r.previewPath = result.path; r.previewAt = result.at; delete r.previewError; persist(); render(); } catch (e) { r.previewError = e.message; persist(); render(); throw e; } }
-  var namedBoard, namedKey;
-  function boardFrom(source) {
-    var model = {
-      product: source.product, fields: Object.assign({}, source.fields),
-      slots: source.slots.map(function (slot) {
-        return {id: C.uid(), pattern: slot.pattern, values: Object.assign({}, slot.values)};
-      })
-    };
-    if (source.naming) model.naming = JSON.parse(JSON.stringify(source.naming));
-    C.ensureNaming(model);
-    return model;
+  var namedKey, namedPhotos;
+  function loadNamedPhotos(key) {
+    var photos = S.read('photos:' + key, null);
+    if (photos) return photos;
+    photos = {};
+    var legacy = S.read(key, null);
+    if (legacy) {
+      var used = new Set();
+      legacy.slots.forEach(function (old) {
+        var slot = session.slots.find(function (candidate) {
+          return !used.has(candidate.id) && candidate.pattern === old.pattern &&
+            JSON.stringify(candidate.values || {}) === JSON.stringify(old.values || {});
+        });
+        if (!slot && !old.override && !old.path) return;
+        if (!slot) {
+          slot = {id:C.uid(), pattern:old.pattern, values:Object.assign({},old.values), selected:true};
+          session.slots.push(slot);
+        }
+        used.add(slot.id);
+        if (old.override) slot.filenameOverride = old.override;
+        if (old.path) photos[slot.id] = {path:old.path, lastFile:old.lastFile, frame:old.frame, thumbnail:old.thumbnail};
+      });
+      persist();
+    }
+    S.write('photos:' + key, photos);
+    return photos;
   }
-  function namedFilename(board, slot) {
-    return (slot.override ? C.filename(slot.override, board.product, {fields: board.fields}) :
-      C.slotFilename(board, slot)) + '.png';
-  }
-  function persistNamed() { S.write(namedKey, namedBoard); }
   async function saveNamed(key, slot) {
     if (B.demo) throw new Error('请在 AE 中保存当前帧。');
     var record = await B.call('capture');
     if (key !== 'named:' + C.sessionKey(record.projectKey, record.compId)) {
       await sync(); throw new Error('当前合成已切换，请在对应占位上重新保存。');
     }
-    var filename = namedFilename(namedBoard, slot);
+    var latest = S.read(C.sessionKey(record.projectKey, record.compId), session);
+    var current = latest.slots.find(function (entry) { return entry.id === slot.id; });
+    if (!current) throw new Error('占位已移除，请刷新后再保存。');
+    var filename = C.slotFilename(latest, current) + '.png';
     var destination = S.pngDestination(record.projectKey);
     var result = await runner.savePng(record, destination.directory, filename, true);
-    slot.lastFile = result.filename;
-    slot.path = result.path;
-    slot.frame = record.displayFrame;
-    slot.thumbnail = result.thumbnail;
-    persistNamed();
+    namedPhotos[slot.id] = {lastFile:result.filename, path:result.path, frame:record.displayFrame, thumbnail:result.thumbnail};
+    S.write('photos:' + key, namedPhotos);
     drawNamed();
     notice('已保存：' + result.path);
   }
   function editNamed(slot) {
-    var initial = slot.override || '';
-    if (!initial) { try { initial = C.slotFilename(namedBoard, slot); } catch (_) {} }
-    ask('占位文件名（不含 .png）', initial, function (value) {
-      var name = value.trim();
-      if (!name) throw new Error('请输入文件名。');
-      C.filename(name, namedBoard.product, {fields: namedBoard.fields});
-      if (!namedBoard.slots.some(function (item) { return item.id === slot.id; })) namedBoard.slots.push(slot);
-      slot.override = name; persistNamed(); drawNamed();
+    var box = node('div'), inputs = [];
+    session.naming.fields.filter(function (f) { return f.type === 'custom'; }).forEach(function (f) {
+      var label = node('label', f.label), input = node('input');
+      input.value = (slot.values || {})[f.id] || ''; label.append(input); box.append(label);
+      inputs.push({field:f.id, input:input});
+    });
+    var override;
+    if (!inputs.length || slot.filenameOverride) {
+      var label = node('label', '独立文件名（留空使用命名字段）'); override = node('input');
+      override.value = slot.filenameOverride || ''; label.append(override); box.append(label);
+    }
+    modal('卡片命名', box, '保存', function () {
+      if (override && override.value) C.filename(override.value, session.product, {fields:session.fields});
+      if (override) slot.filenameOverride = override.value.trim();
+      slot.values = slot.values || {};
+      inputs.forEach(function (entry) { slot.values[entry.field] = entry.input.value; });
+      if (!session.slots.some(function (item) { return item.id === slot.id; })) session.slots.push(slot);
+      persist(); render();
     });
   }
   function drawNamed() {
@@ -241,51 +291,36 @@
     var available = session && session.projectKey && session.compId != null;
     $('named-controls').hidden = !available;
     $('named-add').hidden = !available;
-    $('named-comp').textContent = available ? session.compName : '请保存工程并激活要保存的合成。';
-    if (!available) { namedKey = null; namedBoard = null; return; }
+    $('named-comp').hidden = available;
+    if (!available) { namedKey = null; return; }
     var key = 'named:' + C.sessionKey(session.projectKey, session.compId);
-    if (key !== namedKey) {
-      namedKey = key; namedBoard = S.read(key, null);
-      if (!namedBoard) { namedBoard = boardFrom(session); persistNamed(); }
-    }
-    var select = $('named-preset'), previous = select.value;
-    select.replaceChildren(new Option('当前合成的分层导出命名', ''));
-    config.presets.forEach(function (preset) { select.add(new Option(preset.name, preset.id)); });
-    select.value = previous;
-    namedBoard.slots.forEach(function (slot) {
+    if (key !== namedKey) { namedKey = key; namedPhotos = {}; namedPhotos = loadNamedPhotos(key); }
+    session.slots.forEach(function (slot) {
+      var photo = namedPhotos[slot.id] || {};
       var card = node('article', null, 'named-card');
       var save = button('', function () { return saveNamed(key, slot); });
       save.className = 'named-save';
       var visual = node('span', null, 'named-visual');
-      if (slot.thumbnail) { var img = node('img'); img.src = slot.thumbnail; img.alt = ''; visual.append(img); }
+      if (photo.thumbnail) { var img = node('img'); img.src = photo.thumbnail; img.alt = ''; visual.append(img); }
       else visual.append(node('span', '＋ 保存当前帧'));
       var label;
-      try { label = namedFilename(namedBoard, slot); } catch (err) { label = err.message; }
+      try { label = C.slotFilename(session, slot) + '.png'; } catch (err) { label = err.message; }
       save.title = '保存当前帧 · ' + label;
       save.append(visual, node('strong', label));
       var actions = node('div', null, 'record-actions');
       actions.append(button('改名', function () { editNamed(slot); }), button('移除占位', function () {
-        namedBoard.slots = namedBoard.slots.filter(function (item) { return item.id !== slot.id; });
-        persistNamed(); drawNamed();
+        session.slots = session.slots.filter(function (item) { return item.id !== slot.id; });
+        persist(); render();
       }));
       card.append(save);
-      if (slot.lastFile) {
-        var last = node('small', '帧 ' + slot.frame + ' · ' + slot.lastFile);
-        last.title = slot.path; card.append(last);
+      if (photo.lastFile) {
+        var last = node('small', '帧 ' + photo.frame + ' · ' + photo.lastFile);
+        last.title = photo.path; card.append(last);
       }
       card.append(actions); grid.append(card);
     });
   }
-  $('named-add').onclick = guard(function () { editNamed({id: C.uid(), pattern: '', values: {}}); });
-  $('named-import').onclick = guard(function () {
-    var preset = config.presets.find(function (p) { return p.id === $('named-preset').value; });
-    var source = session;
-    if (preset) { source = C.newSession(session.projectKey); C.applyPreset(source, preset); }
-    var replacement = boardFrom(source);
-    modal('套用命名', node('p', '将当前合成的占位列表替换为 ' + replacement.slots.length + ' 个新占位。已保存的 PNG 会保留。'), '套用', function () {
-      namedBoard = replacement; persistNamed(); drawNamed();
-    });
-  });
+  $('named-add').onclick = guard(function () { editNamed({id: C.uid(), pattern: '新名称', values: {}, selected:true, recordId:null}); });
   async function savePng() {
     if (B.demo) throw new Error('请在 AE 2025 内使用保存 PNG 并复制。');
     var record = await B.call('capture');
@@ -403,12 +438,12 @@
         var projectSaved = S.read(C.projectSessionKey(session.projectKey), session);
         refreshProject(projectSaved);
         var projectConfig = S.read('config', config), projectSignature = JSON.stringify([projectSaved, projectConfig]);
-        if (projectSignature !== lastShared) { lastShared = projectSignature; session = projectSaved; config = projectConfig; render(); }
+        if (projectSignature !== lastShared) { lastShared = projectSignature; session = projectSaved; config = projectConfig; rememberConfig(); render(); }
         return;
       }
       if (!session || session.compId == null) return;
       var saved = S.read(C.sessionKey(session.projectKey, session.compId), null), cfg = S.read('config', config), signature = JSON.stringify([saved,cfg]);
-      if (signature !== lastShared) { lastShared = signature; if (saved) session = saved; config = cfg; render(); }
+      if (signature !== lastShared) { lastShared = signature; if (saved) { session = saved; namingBase = nameState(saved); } config = cfg; rememberConfig(); render(); }
     } catch (e) { notice('合成同步失败：' + e.message, true); }
     finally { polling = false; }
   }
@@ -426,10 +461,11 @@
     $('close-board').textContent = '关闭';
     document.title = 'Frame Shelf · 命名与导出';
   } else {
+    $('named-controls').append(document.querySelector('.naming'));
     $('export-button').querySelector('span').textContent = '打开命名与导出窗口 ↗';
   }
   window.addEventListener('focus', refreshShared);
   window.setInterval(refreshShared, 1000);
-  async function init() { lock(true); $('status').textContent = '正在读取工程与模板…'; try { config = S.read('config', null) || C.defaults(); config.settings = Object.assign(C.defaults().settings, config.settings); $('demo-banner').hidden = !B.demo; await sync(); await reload(); page(exportWindow ? 'board' : 'workspace'); $('status').textContent = '准备就绪'; } catch (e) { notice(e.message, true); $('status').textContent = '初始化失败，请检查 AE 工程或重新打开面板'; } finally { lock(false); } }
+  async function init() { lock(true); $('status').textContent = '正在读取工程与模板…'; try { config = S.read('config', null) || C.defaults(); rememberConfig(); config.settings = Object.assign(C.defaults().settings, config.settings); $('demo-banner').hidden = !B.demo; await sync(); await reload(); page(exportWindow ? 'board' : 'workspace'); $('status').textContent = '准备就绪'; } catch (e) { notice(e.message, true); $('status').textContent = '初始化失败，请检查 AE 工程或重新打开面板'; } finally { lock(false); } }
   init();
 }());

@@ -98,3 +98,9 @@
 .named-save strong,.named-card small{display:block;overflow-wrap:anywhere;margin:7px 0}
 .named-card small{color:#a0afba}
 .named-card .record-actions{margin-top:auto}
+
+#named-controls{display:block;margin:8px 0 12px}
+#named-controls[hidden]{display:none}
+#named-controls summary{cursor:pointer;padding:6px 0;color:#a9c9da}
+.capture-window #named-controls .naming{display:block;padding:12px;border:1px solid #35414b;border-radius:5px}
+#named-controls .eyebrow{display:none}
