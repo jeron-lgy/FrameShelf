@@ -100,7 +100,9 @@
 .named-heading{display:flex;align-items:center;gap:3px;min-width:0}
 .named-filename{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .named-filename{flex:1;font-size:12px}
-.named-remove{justify-self:end;padding:2px 5px;border:1px solid #414c56;border-radius:3px;background:#282d32;color:#b4c1cb;font-size:10px;line-height:15px}
+.named-edit-row{display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0}
+.named-edit-row .named-custom{flex:1}
+.named-remove{flex:none;white-space:nowrap;padding:2px 5px;border:1px solid #414c56;border-radius:3px;background:#282d32;color:#b4c1cb;font-size:10px;line-height:15px}
 .named-custom{display:block;min-width:0}
 .named-custom input{width:100%;min-width:0;box-sizing:border-box;height:23px;padding:2px 5px;font-size:11px}
 @media(hover:none){.named-save{opacity:1;pointer-events:auto}}

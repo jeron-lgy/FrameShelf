@@ -416,7 +416,10 @@
         });
         remove.className = 'named-remove'; remove.title = '移除卡槽';
         remove.setAttribute('aria-label', '移除卡槽 · ' + title.textContent);
-        body.append(remove);
+        var row = node('div', null, 'named-edit-row');
+        var lastField = body.lastElementChild;
+        if (lastField.classList.contains('named-custom')) row.append(lastField);
+        row.append(remove); body.append(row);
       }
       grid.append(card);
   }
