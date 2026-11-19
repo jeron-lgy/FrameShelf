@@ -359,20 +359,55 @@
   function drawNamedCard(grid, owner, slot, photos, sourceId) {
       var photo = photos[slot.id] || {};
       var card = node('article', null, 'named-card');
-      var save = button('', function () { return saveNamed(owner, slot, sourceId); });
+      card.dataset.slotId = slot.id;
+      var visual = node('div', null, 'named-visual');
+      if (photo.thumbnail) {
+        var img = node('img'); img.src = photo.thumbnail; img.alt = ''; visual.append(img);
+      } else visual.append(node('span', '空占位'));
+      var save = button('保存当前帧', function () { return saveNamed(owner, slot, sourceId); });
       save.className = 'named-save';
-      var visual = node('span', null, 'named-visual');
-      if (photo.thumbnail) { var img = node('img'); img.src = photo.thumbnail; img.alt = ''; visual.append(img); }
-      else visual.append(node('span', '＋ 保存当前帧'));
-      var label = slotLabel(owner, slot);
-      save.title = '保存当前帧 · ' + label;
-      save.append(visual, node('strong', label));
+      var title = node('strong', slotLabel(owner, slot), 'named-filename');
+      save.setAttribute('aria-label', '保存当前帧 · ' + title.textContent);
+      visual.append(save);
+      card.append(visual, title);
+      if (!slot.filenameOverride && owner.naming) {
+        owner.naming.fields.filter(function (field) { return field.type === 'custom'; }).forEach(function (field) {
+          var label = node('label', field.label, 'named-custom'), input = node('input');
+          var previous = (slot.values || {})[field.id] || '';
+          input.value = previous;
+          bindText(input, function () {
+            if (!input.isConnected || owner.projectKey !== session.projectKey) return;
+            var key = C.sessionKey(owner.projectKey, owner.compId);
+            function writeField() {
+              var latest = S.read(key, null);
+              var current = latest && latest.slots.find(function (item) { return item.id === slot.id; });
+              if (!current || current.filenameOverride || !latest.naming || !latest.naming.fields.some(function (f) {
+                return f.id === field.id && f.type === 'custom';
+              })) throw new Error('命名设置已变化，请重新打开此卡片。');
+              var value = (current.values || {})[field.id] || '';
+              if (value !== previous) {
+                input.value = previous = value;
+                title.textContent = slotLabel(latest, current);
+                throw new Error('此字段刚在另一面板修改，已显示最新值。');
+              }
+              current.values = current.values || {};
+              current.values[field.id] = input.value;
+              S.write(key, latest);
+              previous = input.value;
+              if (owner.compId === session.compId) { session = latest; namingBase = nameState(latest); }
+              title.textContent = slotLabel(latest, current);
+              save.setAttribute('aria-label', '保存当前帧 · ' + title.textContent);
+            }
+            if (S.withStateLock) S.withStateLock(writeField); else writeField();
+          });
+          label.append(input); card.append(label);
+        });
+      }
       var actions = node('div', null, 'record-actions');
-      actions.append(button('改名', function () { editNamed(slot); }), button('移除占位', function () {
+      actions.append(button('移除占位', function () {
         session.slots = session.slots.filter(function (item) { return item.id !== slot.id; });
         persist(); render();
       }));
-      card.append(save);
       if (photo.lastFile) {
         var last = node('small', '上次取自：' + (photo.sourceName || owner.compName) + ' · 帧 ' + photo.frame + ' · ' + photo.lastFile);
         last.title = photo.path; card.append(last);
@@ -384,7 +419,20 @@
     allNamedSlots = this.checked; expandedGroups.clear(); $('named-filter').value = ''; drawNamed();
   };
   $('named-filter').oninput = drawNamed;
-  $('named-add').onclick = guard(function () { editNamed({id: C.uid(), pattern: '新名称', values: {}, selected:true, recordId:null}); });
+  $('named-add').onclick = guard(function () {
+    var slot = {id:C.uid(), pattern:'新名称', values:{}, selected:true, recordId:null};
+    var custom = session.naming.fields.find(function (f) { return f.type === 'custom'; });
+    if (custom) slot.values[custom.id] = '新名称';
+    session.slots.push(slot);
+    $('named-filter').value = '';
+    expandedGroups.set(session.compId, true);
+    persist(); render();
+    var card = $('named-grid').querySelector('[data-slot-id="' + slot.id + '"]');
+    if (card) setTimeout(function () {
+      var input = card.querySelector('input');
+      if (input) { input.focus(); input.select(); } else card.scrollIntoView({block:'nearest'});
+    }, 0);
+  });
   async function savePng() {
     if (B.demo) throw new Error('请在 AE 2025 内使用保存 PNG 并复制。');
     var record = await B.call('capture');

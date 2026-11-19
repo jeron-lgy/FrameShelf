@@ -92,10 +92,15 @@
 #named-controls[hidden]{display:none}
 #named-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px}
 .named-card{display:flex;flex-direction:column;min-width:0;background:#1f2226;border:1px solid #35414b;border-radius:5px;padding:8px}
-.named-save{width:100%;padding:0;text-align:left}
+.named-visual{position:relative}
+.named-save{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:7px 12px;background:#285f4a;color:white;border:1px solid #64a98a;border-radius:5px;white-space:nowrap;opacity:0;pointer-events:none}
+.named-visual:hover .named-save,.named-save:focus{opacity:1;pointer-events:auto}
+@media(hover:none){.named-save{opacity:1;pointer-events:auto}}
+.named-custom{display:grid;gap:3px;font-size:10px;color:#a0afba;margin-bottom:6px}
+.named-custom input{width:100%;min-width:0;box-sizing:border-box}
 .named-visual{height:102px;background:#171b1e;border:1px dashed #4c5e69;display:flex;align-items:center;justify-content:center;color:#acc2ce;font-size:12px}
 .named-visual img{width:100%;height:100%;object-fit:contain}
-.named-save strong,.named-card small{display:block;overflow-wrap:anywhere;margin:7px 0}
+.named-filename,.named-card small{display:block;overflow-wrap:anywhere;margin:7px 0}
 .named-card small{color:#a0afba}
 .named-card .record-actions{margin-top:auto}
 
