@@ -160,10 +160,28 @@ function createStore(root) {
       const directory = path.join(root, 'logs');
       fs.mkdirSync(directory, { recursive: true });
       const day = new Date().toISOString().slice(0, 10);
-      const data = Object.assign({ at: new Date().toISOString(), plugin: '0.9.3', node: process.version, platform: process.platform, windows: require('os').release() }, entry);
+      const data = Object.assign({ at: new Date().toISOString(), plugin: '0.10.0', node: process.version, platform: process.platform, windows: require('os').release() }, entry);
       if (entry.directory) data.nodeDirectoryExists = fs.existsSync(entry.directory);
       fs.appendFileSync(path.join(directory, 'render-' + day + '.jsonl'), JSON.stringify(data) + '\n', 'utf8');
     } catch (_) { /* Best-effort diagnostics. */ }
+  }
+  const sessionCache = new Map();
+  function compositionSessions(projectKey) {
+    const result = [];
+    for (const name of fs.readdirSync(root).sort()) {
+      if (!/^[a-f0-9]{32}\.json$/.test(name)) continue;
+      const file = path.join(root, name), stat = fs.statSync(file), stamp = stat.mtimeMs + ':' + stat.size;
+      let cached = sessionCache.get(name);
+      if (!cached || cached.stamp !== stamp) {
+        let data;
+        try { data = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); }
+        catch (_) { throw new Error('记录文件损坏，无法完整汇总工程组合：' + file); }
+        cached = { stamp, data }; sessionCache.set(name, cached);
+      }
+      const data = cached.data;
+      if (data && data.projectKey === projectKey && data.compId != null && Array.isArray(data.records) && fileFor(core.sessionKey(projectKey, data.compId)) === file) result.push(JSON.parse(JSON.stringify(data)));
+    }
+    return result;
   }
   function pngDestination(projectFile, now = new Date()) {
     if (!projectFile || !path.isAbsolute(projectFile) || !fs.existsSync(projectFile)) throw new Error('请先保存 AE 工程，再保存 PNG。');
@@ -180,7 +198,16 @@ function createStore(root) {
     if (path.dirname(real) !== previewRoot || fs.statSync(real).size > 16 * 1024 * 1024) return '';
     return 'data:image/png;base64,' + fs.readFileSync(real).toString('base64');
   }
-  return { renderDirectory, logDiagnostic, pngDestination, copyPngFile: require('./clipboard.cjs').copyPngFile, root, native: true, read, write, stage, cleanup, publish, availableNames, validateDirectory, waitPreview, savePreview, imageUrl, verify: images.verify,
+  async function straightPng(stage, file) {
+    assertStage(stage, file);
+    const target = path.join(stage.directory, 'straight.png');
+    const exe = path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe');
+    await require('util').promisify(require('child_process').execFile)(exe,
+      ['-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'straight-png.ps1')],
+      {windowsHide:true, env:Object.assign({}, process.env, {FRAMESHELF_INPUT:file, FRAMESHELF_OUTPUT:target})});
+    return target;
+  }
+  return { compositionSessions, straightPng, renderDirectory, logDiagnostic, pngDestination, copyPngFile: require('./clipboard.cjs').copyPngFile, root, native: true, read, write, stage, cleanup, publish, availableNames, validateDirectory, waitPreview, savePreview, imageUrl, verify: images.verify,
     normalizeOutput: (job, file, profile) => { assertStage(job, file); return images.normalizeTiffAlpha(file, profile); },
     withStateLock, acquireJob: () => acquireLock('render'), jobActive: () => activeLock('render') };
 }

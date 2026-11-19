@@ -2,7 +2,9 @@
   'use strict';
   var exportWindow = window.__adobe_cep__ ? window.__adobe_cep__.getExtensionId() === 'com.frameshelf.ae.exportpanel' : new URLSearchParams(location.search).get('window') === 'export';
   document.body.classList.add(exportWindow ? 'export-window' : 'capture-window');
-  var popup = null;
+  var popup = null, projectMode = false;
+  function projectScope() { return exportWindow && projectMode; }
+  function refreshProject(value) { return C.refreshProjectRecords(value, S.compositionSessions(value.projectKey), S.read('session:' + value.projectKey, null)); }
   var C = window.FrameShelfCore, B = window.FrameShelfBridge, S = window.FrameShelfStorage;
   var $ = function (id) { return document.getElementById(id); }, config, session, profiles = [], busy = false, info, accept;
   function node(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
@@ -15,6 +17,11 @@
   function persistUnlocked() {
     if (exportWindow) S.write('config', config);
     else { var current = S.read('config', null); if (!current) S.write('config', config); else { if (!current.settings.previewTemplate && config.settings.previewTemplate) { current.settings.previewTemplate = config.settings.previewTemplate; S.write('config', current); } config = current; } }
+    if (session && session.scope === 'project') {
+      refreshProject(session);
+      S.write(C.projectSessionKey(session.projectKey), Object.assign({}, session, { records: [] }));
+      return;
+    }
     if (session && session.compId != null) { session = C.mergeSession(session, S.read(C.sessionKey(session.projectKey, session.compId), null), exportWindow ? 'export' : 'capture'); S.write(C.sessionKey(session.projectKey, session.compId), session); }
   }
   function persist() { return S.withStateLock ? S.withStateLock(persistUnlocked) : persistUnlocked(); }
@@ -43,10 +50,10 @@
     $('board-records').replaceChildren(); $('board-targets').replaceChildren();
     session.records.forEach(function (r) {
       var card = node('article',null,'board-card' + (picked === r.id ? ' picked' : ''));
-      var select = button(r.label, function () { picked = r.id; drawBoard(); }); select.className='source-select';select.prepend(image(r));select.draggable=true;
+      var select = button(session.scope === 'project' ? r.compName + ' [#' + r.compId + '] · ' + r.label : r.label, function () { picked = r.id; drawBoard(); }); select.className='source-select';select.prepend(image(r));select.draggable=true;
       select.ondragstart = function(e){if(busy){e.preventDefault();return;}e.dataTransfer.setData('text/plain',r.id);};
       var remove=button('删除组合',function(){deleteCombination(r.id);});remove.className='source-delete';remove.setAttribute('aria-label','删除组合 '+r.label);
-      card.append(select,remove);$('board-records').append(card);
+      card.append(select); if (session.scope !== 'project') card.append(remove);$('board-records').append(card);
     });
     session.slots.forEach(function (s) {
       var card = node('article', null, 'board-card target' + (activeSlot === s.id ? ' editing' : '')); card.dataset.id = s.id;
@@ -65,7 +72,7 @@
       var r = session.records.find(function (r) { return r.id === s.recordId; });
       var visual = button('', function () { if (!picked) { notice('先点选左侧组合，或把组合拖入此卡片。'); return; } C.assign(session, s.id, picked); persist(); render(); });
       visual.className = 'assignment-visual'; visual.setAttribute('aria-label', '分配组合到 ' + s.pattern); visual.append(r ? image(r) : node('span', '拖入组合 / 点击分配', 'drop-hint'));
-      var actions = node('div', null, 'slot-actions'); actions.append(button('清除分配', function () { C.assign(session, s.id, null); persist(); render(); }), remove); card.append(top, inputs, visual, node('small', r ? r.label : '尚未分配'), actions); filename();
+      var actions = node('div', null, 'slot-actions'); actions.append(button('清除分配', function () { C.assign(session, s.id, null); persist(); render(); }), remove); card.append(top, inputs, visual, node('small', r ? (session.scope === 'project' ? r.compName + ' [#' + r.compId + '] · ' : '') + r.label : '尚未分配'), actions); filename();
       if (s.selected === false) card.classList.add('not-selected');
       card.ondragover = function (e) { if (!busy) { e.preventDefault(); card.classList.add('drag-over'); } }; card.ondragleave = function () { card.classList.remove('drag-over'); };
       card.ondrop = guard(function (e) { e.preventDefault(); C.assign(session, s.id, e.dataTransfer.getData('text/plain')); persist(); render(); }); $('board-targets').append(card);
@@ -75,6 +82,7 @@
   function render() {
     if (!session) return;
     C.ensureNaming(session);
+    $('load-demo').hidden = session.scope === 'project';
     $('record-count').textContent = session.records.length; $('history-count').textContent = session.history.length;
     $('gallery').replaceChildren(); var query = $('search').value.toLowerCase();
     session.records.filter(function (r) { return (r.label + r.compName).toLowerCase().includes(query); }).forEach(function (r, i) {
@@ -141,10 +149,22 @@
     info = next;
     $('host-label').textContent = B.demo ? '浏览器演示' : 'AE ' + info.version;
     $('project-bits').textContent = info.bits + ' BPC';
+    if (projectScope() && info.projectKey) {
+      var projectChanged = !session || session.scope !== 'project' || session.projectKey !== info.projectKey;
+      if (projectChanged) {
+        session = S.read(C.projectSessionKey(info.projectKey), null);
+        if (!session) { session = C.newSession(info.projectKey); session.scope = 'project'; session.compId = null; C.applyPreset(session, config.presets[0]); }
+        refreshProject(session); picked = null; activeSlot = null; lastShared = '';
+      }
+      $('scope-label').textContent = '当前工程全部组合：' + info.projectName;
+      $('project-name').textContent = info.projectName;
+      if (projectChanged) render();
+      return projectChanged;
+    }
     if (!info.projectKey || info.compId == null) {
       $('scope-label').textContent = '请保存工程并激活合成时间线';
       $('project-name').textContent = info.projectName;
-      if (!session || session.compId != null || session.projectKey !== info.projectKey) { session = C.newSession(info.projectKey); session.compId = null; picked = null; activeSlot = null; render(); }
+      if (!session || session.scope === 'project' || session.compId != null || session.projectKey !== info.projectKey) { session = C.newSession(info.projectKey); session.compId = null; picked = null; activeSlot = null; render(); }
       return false;
     }
     var changed = !session || session.projectKey !== info.projectKey || session.compId !== info.compId;
@@ -189,15 +209,26 @@
   }
   async function review() {
     if (B.demo) throw new Error('浏览器只演示交互。请在 AE 2025 中执行真实导出。');
-    var current = await B.call('info'); if (!session || current.projectKey !== session.projectKey || current.compId !== session.compId) { adoptInfo(current); throw new Error('当前合成已变化，请核对卡槽后再次导出。'); }
+    var current = await B.call('info'); if (!session || current.projectKey !== session.projectKey || (session.scope !== 'project' && current.compId !== session.compId)) { adoptInfo(current); throw new Error('当前合成已变化，请核对卡槽后再次导出。'); }
     checkRecovery(); if (!$('recovery-banner').hidden) throw new Error('请先处理上次中断任务的恢复记录。');
+    if (session.scope === 'project') persist();
     var plan = C.buildPlan(session, profile()), options = { directory: config.settings.outputDir, conflict: config.settings.conflict };
     plan = S.availableNames(options.directory, plan, options.conflict); await B.call('validate', { records: plan.map(function (j) { return j.record; }) });
-    var wrap = node('div'), table = node('table', null, 'review-table'); plan.forEach(function (j) { var tr = node('tr'); tr.append(node('td', j.filename), node('td', j.record.label), node('td', j.record.width + ' × ' + j.record.height + ' / 帧 ' + j.record.displayFrame)); table.append(tr); });
+    var wrap = node('div'), table = node('table', null, 'review-table'); plan.forEach(function (j) { var tr = node('tr'); tr.append(node('td', j.filename), node('td', j.record.compName + ' [#' + j.record.compId + '] · ' + j.record.label), node('td', j.record.width + ' × ' + j.record.height + ' / 帧 ' + j.record.displayFrame)); table.append(tr); });
     wrap.append(node('p', options.directory), table, node('p', '渲染期间 AE 会被占用。按记录的独显组合与帧输出，内容取自当前工程；输出设置取自所选 AE 模板。', 'review-note'));
     modal('核对 ' + plan.length + ' 个输出', wrap, '开始渲染', async function () {
       lock(true); $('stop-button').hidden = false; notice('');
-      try { options.onResult = function (r) { session.history.push(r); persist(); }; var result = await runner.batch(plan, options); notice(result.stopped ? '已停止，完成的文件已保留。' : '已完成 ' + result.results.length + ' 个文件。'); }
+      try {
+        var confirmed = await B.call('info');
+        if (confirmed.projectKey !== session.projectKey || (session.scope !== 'project' && confirmed.compId !== session.compId)) throw new Error('工程或合成已切换，请重新检查导出清单。');
+        if (session.scope === 'project') {
+          refreshProject(session);
+          plan.forEach(function (job) {
+            var latest = session.records.find(function (r) { return r.id === job.record.id; });
+            if (!latest || JSON.stringify(latest) !== JSON.stringify(job.record)) throw new Error('组合已删除或更新，请重新检查导出清单：' + job.record.label);
+          });
+        }
+        options.onResult = function (r) { session.history.push(r); persist(); }; var result = await runner.batch(plan, options); notice(result.stopped ? '已停止，完成的文件已保留。' : '已完成 ' + result.results.length + ' 个文件。'); }
       finally { lock(false); $('stop-button').hidden = true; render(); $('status').textContent = '任务已结束'; }
     });
   }
@@ -205,6 +236,38 @@
   ['dialog-close', 'dialog-cancel'].forEach(function (id) { $(id).onclick = function () { $('dialog').close(); }; });
   document.querySelectorAll('[data-page]').forEach(function (b) { b.onclick = guard(function () { page(b.dataset.page); }); });
   $('edit-output-template').onclick = guard(async function () { if (B.demo) { notice('请在 AE 中打开原生输出模块模板窗口。'); return; } if (S.jobActive && S.jobActive()) throw new Error('请等待渲染完成后修改模板。'); var release = S.acquireJob ? S.acquireJob() : function () {}; try { await B.call('editOutputTemplates'); } finally { release(); } await reload(); notice('模板列表已刷新'); });
+  function toggleSaveMenu(open) {
+    $('save-menu').hidden = !open;
+    $('save-options').setAttribute('aria-expanded', String(open));
+  }
+  $('save-options').onclick = function () { toggleSaveMenu($('save-menu').hidden); };
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#save-options') || e.target.closest('#save-menu') && !e.target.closest('button')) return;
+    toggleSaveMenu(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('save-menu').hidden) { toggleSaveMenu(false); $('save-options').focus(); }
+  });
+  $('normal-save').onclick = guard(savePng);
+  $('queue-template').onclick = guard(async function () {
+    await reload();
+    var select = node('select');
+    select.setAttribute('aria-label', '完美保存默认模板');
+    select.add(new Option('自动选择透明 PNG', ''));
+    profiles.filter(function (p) { return p.supported && !p.hidden; }).forEach(function (p) { select.add(new Option(p.name, p.name)); });
+    select.value = S.read('perfect-save-template', '') || '';
+    modal('完美保存默认模板', select, '保存', function () { S.write('perfect-save-template', select.value); });
+  });
+  $('queue-png').onclick = guard(async function () {
+    if (B.demo) throw new Error('请在 AE 中使用完美保存。');
+    var release = S.acquireJob();
+    try {
+      var record = await B.call('capture');
+      var destination = S.pngDestination(record.projectKey);
+      var result = await B.call('queuePng', { record: record, directory: destination.directory, filename: destination.filename, template: S.read('perfect-save-template', '') });
+      notice('已加入渲染队列 · ' + result.template + ' · ' + result.path + '。点击 AE 的「渲染」开始输出。');
+    } finally { release(); }
+  });
   $('save-png-copy').onclick = guard(savePng);
   ['add-record', 'empty-add'].forEach(function (id) { $(id).onclick = guard(capture); }); $('export-button').onclick = guard(exportWindow ? review : openExport); $('export-top').onclick = guard(openExport);
   $('sync-project').onclick = guard(sync); $('reload-profiles').onclick = guard(reload); $('search').oninput = render;
@@ -239,12 +302,24 @@
       var next = await B.call('info');
       if (inputRevision !== inputGate.revision() || fieldDragging || busy || $('dialog').open || inputGate.blocked()) return;
       adoptInfo(next);
+      if (session && session.scope === 'project') {
+        var projectSaved = S.read(C.projectSessionKey(session.projectKey), session);
+        refreshProject(projectSaved);
+        var projectConfig = S.read('config', config), projectSignature = JSON.stringify([projectSaved, projectConfig]);
+        if (projectSignature !== lastShared) { lastShared = projectSignature; session = projectSaved; config = projectConfig; render(); }
+        return;
+      }
       if (!session || session.compId == null) return;
       var saved = S.read(C.sessionKey(session.projectKey, session.compId), null), cfg = S.read('config', config), signature = JSON.stringify([saved,cfg]);
       if (signature !== lastShared) { lastShared = signature; if (saved) session = saved; config = cfg; render(); }
     } catch (e) { notice('合成同步失败：' + e.message, true); }
     finally { polling = false; }
   }
+  $('project-scope-toggle').onchange = guard(async function () {
+    var desired = $('project-scope-toggle').checked;
+    try { persist(); projectMode = desired; await sync(); lastShared = ''; }
+    catch (error) { projectMode = session && session.scope === 'project'; $('project-scope-toggle').checked = projectMode; throw error; }
+  });
   if (exportWindow) {
     $('board-tools').append(document.querySelector('.naming'));
     document.querySelector('.toolbar').append(document.querySelector('.tabs'), $('close-board'));

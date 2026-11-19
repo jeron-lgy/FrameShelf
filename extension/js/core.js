@@ -32,6 +32,27 @@
     return { version: 2, projectKey: projectKey, records: [], slots: [], product: '', presetId: 'starter', history: [] };
   }
   function sessionKey(projectKey, compId) { return 'composition:' + JSON.stringify([projectKey, compId]); }
+  function projectSessionKey(projectKey) { return 'project-export:' + projectKey; }
+  function refreshProjectRecords(session, sources, legacy) {
+    var records = [], seen = Object.create(null), comps = Object.create(null);
+    sources.forEach(function (source) {
+      if (source.projectKey !== session.projectKey || source.compId == null) return;
+      comps[source.compId] = true;
+      (source.records || []).forEach(function (r) {
+        if (r.projectKey !== session.projectKey || r.compId !== source.compId || (source.deletedRecordIds || []).indexOf(r.id) >= 0) return;
+        if (seen[r.id]) throw new Error('组合 ID 冲突，请检查源合成：' + r.compName);
+        seen[r.id] = true; records.push(r);
+      });
+    });
+    if (legacy && legacy.projectKey === session.projectKey) (legacy.records || []).forEach(function (r) {
+      if (comps[r.compId] || (legacy.deletedRecordIds || []).indexOf(r.id) >= 0) return;
+      if (seen[r.id]) throw new Error('旧组合 ID 冲突：' + r.compName);
+      seen[r.id] = true; records.push(r);
+    });
+    session.records = JSON.parse(JSON.stringify(records));
+    session.slots.forEach(function (slot) { if (slot.recordId && !seen[slot.recordId]) slot.recordId = null; });
+    return session;
+  }
   function compositionSession(projectKey, compId, compName, legacy, preset) {
     var result = newSession(projectKey); result.version = 3; result.compId = compId; result.compName = compName;
     var records = legacy && legacy.records.filter(function (r) { return r.compId === compId; });
@@ -151,6 +172,6 @@
     merged.slots = (merged.slots || []).map(function (slot) { return Object.assign({}, slot, { recordId: ids.indexOf(slot.recordId) >= 0 ? slot.recordId : null }); });
     return merged;
   }
-  return { ensureNaming: ensureNaming, slotFilename: slotFilename, moveField: moveField, namingPreset: namingPreset, addField: addField, sessionKey: sessionKey, compositionSession: compositionSession, updateRecord: updateRecord, mergeSession: mergeSession, uid: uid, filename: filename, defaults: defaults, newSession: newSession, applyPreset: applyPreset,
+  return { projectSessionKey: projectSessionKey, refreshProjectRecords: refreshProjectRecords, ensureNaming: ensureNaming, slotFilename: slotFilename, moveField: moveField, namingPreset: namingPreset, addField: addField, sessionKey: sessionKey, compositionSession: compositionSession, updateRecord: updateRecord, mergeSession: mergeSession, uid: uid, filename: filename, defaults: defaults, newSession: newSession, applyPreset: applyPreset,
     buildPlan: buildPlan, chooseAvailable: chooseAvailable, assign: assign };
 }));

@@ -258,7 +258,69 @@ var FrameShelf = (function () {
             });
         });
     }
-    var methods = { info: info, capture: capture, profiles: profiles, snapshot: snapshot, recover: recover, render: render, directPreview: directPreview, directPng: function (args) { return directPreview(args, true); }, probe: probe,
+    function applyPngTemplate(item) {
+        var names = item.outputModule(1).templates;
+        // Prefer explicitly named PNG presets, then inspect custom template names.
+        for (var pass = 0; pass < 2; pass++) {
+            for (var i = 0; i < names.length; i++) {
+                if (/png/i.test(names[i]) !== (pass === 0)) { continue; }
+                try {
+                    item.outputModule(1).applyTemplate(names[i]);
+                    var settings = item.outputModule(1).getSettings(GetSettingsFormat.STRING);
+                    if (!/png/i.test(settings.Format) || settings.Resize === "true" || settings.Crop === "true") { continue; }
+                    if (settings.Channels !== "RGB + Alpha") { item.outputModule(1).setSettings({ Channels: "RGB + Alpha" }); }
+                    if (!/^straight/i.test(item.outputModule(1).getSettings(GetSettingsFormat.STRING).Color)) {
+                        item.outputModule(1).setSettings({ Color: "Straight (Unmatted)" });
+                    }
+                    settings = item.outputModule(1).getSettings(GetSettingsFormat.STRING);
+                    if (settings.Channels === "RGB + Alpha" && /^straight/i.test(settings.Color)) { return names[i]; }
+                } catch (ignore) {}
+            }
+        }
+        throw new Error("请在 AE 保存 PNG 输出模块模板，选择 RGB + Alpha、Straight（直通），关闭缩放和裁切。");
+    }
+    function queuePng(args) {
+        permission();
+        var comp = checkedComp(args.record), queue = app.project.renderQueue;
+        var folder = new Folder(args.directory), reserved = {}, i, j;
+        if (!folder.exists) { throw new Error("PNG 输出目录不存在。"); }
+        for (i = 1; i <= queue.numItems; i++) {
+            var previous = queue.item(i);
+            for (j = 1; j <= previous.numOutputModules; j++) {
+                var existing = previous.outputModule(j).file;
+                if (existing) { reserved[existing.fsName.toLowerCase()] = true; }
+            }
+        }
+        var item = queue.items.add(comp);
+        try {
+            item.setSettings({ "Quality": "Best", "Resolution": "1,1" });
+            item.timeSpanDuration = comp.frameDuration;
+            item.timeSpanStart = args.record.frameIndex * comp.frameDuration;
+            if (Math.round(item.timeSpanStart / comp.frameDuration) !== args.record.frameIndex ||
+                Math.round(item.timeSpanDuration / comp.frameDuration) !== 1) {
+                throw new Error("AE 未能设置当前单帧范围。");
+            }
+            var chosen = args.template || applyPngTemplate(item);
+            if (args.template) { item.outputModule(1).applyTemplate(chosen); }
+            var output = profile(chosen, item.outputModule(1));
+            if (!output.supported) { throw new Error("请选择受支持的静帧输出模板。"); }
+            var stem = args.filename.replace(/\.png$/i, ""), suffix = 0, file;
+            do {
+                var name = stem + (suffix ? "_" + suffix : "") + output.ext;
+                file = new File(folder.absoluteURI + "/" + encodeURIComponent(name));
+                suffix++;
+            } while (file.exists || reserved[file.fsName.toLowerCase()]);
+
+            item.outputModule(1).postRenderAction = PostRenderAction.NONE;
+            item.outputModule(1).file = file;
+            var assigned = item.outputModule(1).file;
+            if (!assigned || assigned.fsName !== file.fsName) { throw new Error("AE 回读的 PNG 路径与目标不符，请检查工程路径和文件名。"); }
+            item.render = true;
+            queue.showWindow(true);
+            return { path: file.fsName, template: chosen };
+        } catch (e) { item.remove(); throw e; }
+    }
+    var methods = { queuePng: queuePng, info: info, capture: capture, profiles: profiles, snapshot: snapshot, recover: recover, render: render, directPreview: directPreview, directPng: function (args) { return directPreview(args, true); }, probe: probe,
         validate: function (args) { for (var i = 0; i < args.records.length; i++) { checkedComp(args.records[i]); } return info(); },
         chooseFolder: function () { var f = Folder.selectDialog("选择批量导出文件夹"); return f ? f.fsName : null; },
         openFolder: function (args) { var f = new Folder(args.path); if (!f.exists) { throw new Error("文件夹不存在。"); } return f.execute(); },

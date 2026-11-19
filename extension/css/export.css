@@ -74,3 +74,12 @@
 .capture-window #save-png-copy{background:#28664f;border-color:#4b9e7c;color:#e0fff1}
 .capture-window #save-png-copy:hover:not(:disabled){background:#328263}
 @media(max-width:580px){.capture-window .tools{gap:6px}.capture-window .tool-divider{margin:0 2px}}
+
+.project-scope-control{display:none}.export-window .project-scope-control{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap;padding:8px 20px;background:#20262c;font-size:12px;border-bottom:1px solid #30363d}.project-scope-control span{font-size:11px;color:#96a7b5}.project-scope-control input{width:14px}
+
+.save-split{position:relative;display:flex}
+.capture-window .save-split #save-png-copy{border-radius:6px 0 0 6px}
+#save-options{background:#28664f;color:white;border:1px solid #4b9e7c;border-left:0;border-radius:0 6px 6px 0;padding:0 4px}
+#save-menu{position:absolute;right:0;top:100%;z-index:20;min-width:146px;background:#292d32;border:1px solid #545c64;border-radius:5px;padding:4px;box-shadow:0 4px 12px #0008}
+#save-menu button{display:block;width:100%;padding:7px 10px;text-align:left}
+#save-menu button:hover,#save-menu button:focus-visible{background:#39464b}

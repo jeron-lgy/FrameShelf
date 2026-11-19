@@ -1,0 +1,20 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({headless:true,channel:'msedge'});try{
+ const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:4173/index.html?window=export');await page.locator('#project-scope-toggle').waitFor();
+ await page.evaluate(()=>{const C=window.FrameShelfCore,S=window.FrameShelfStorage;for(let i=1;i<=2;i++){const s=C.compositionSession('demo:project',i,'同名',null,C.defaults().presets[0]);s.product='单合成'+i;s.records=[{id:'r'+i,projectKey:'demo:project',compId:i,compName:'同名',label:'组合'+i,layers:[],width:100,height:50}];S.write(C.sessionKey('demo:project',i),s);}});
+ await page.reload();await page.locator('#board-records .board-card').waitFor();
+ await page.locator('#project-scope-toggle').check();await page.waitForFunction(()=>document.querySelectorAll('#board-records .board-card').length===2);
+ assert.equal(await page.locator('#board-records .source-delete').count(),0);
+ await page.getByRole('textbox',{name:'产品名 内容',exact:true}).fill('工程名称');await page.locator('#scope-label').click();
+ await page.locator('#board-records .source-select').first().click();await page.locator('.assignment-visual').first().click();
+ await page.evaluate(()=>localStorage.setItem('frameshelf-demo-comp','2'));
+ await page.waitForTimeout(1300);assert.match(await page.locator('#scope-label').textContent(),/当前工程全部组合/);assert.equal(await page.locator('#board-records .board-card').count(),2);
+ await page.locator('#project-scope-toggle').uncheck();await page.waitForFunction(()=>document.querySelector('#scope-label').textContent.startsWith('当前合成：'));assert.equal(await page.getByRole('textbox',{name:'产品名 内容',exact:true}).inputValue(),'单合成2');
+ await page.locator('#project-scope-toggle').check();await page.waitForFunction(()=>document.querySelector('#scope-label').textContent.startsWith('当前工程全部组合：'));assert.equal(await page.getByRole('textbox',{name:'产品名 内容',exact:true}).inputValue(),'工程名称');
+ await page.evaluate(()=>{const C=window.FrameShelfCore,S=window.FrameShelfStorage,s=S.read(C.sessionKey('demo:project',1));s.records=[];s.deletedRecordIds=['r1'];S.write(C.sessionKey('demo:project',1),s);});
+ await page.waitForFunction(()=>document.querySelectorAll('#board-records .board-card').length===1);
+ assert.match(await page.locator('#board-targets .board-card').first().textContent(),/尚未分配/);
+ await page.screenshot({path:'.test-output/project-scope.png'});
+ assert.deepEqual(errors,[]);console.log('PASS project aggregation, naming isolation, active-comp switching, source deletion and stale assignment clearing');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -10,6 +10,16 @@
   } else {
     window.FrameShelfStorage = {
       native: false,
+      compositionSessions: function (projectKey) {
+        var out = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i);
+          if (key.indexOf('frameshelf-v2:composition:') !== 0) continue;
+          var data = JSON.parse(localStorage.getItem(key));
+          if (data && data.projectKey === projectKey && data.compId != null) out.push(data);
+        }
+        return out;
+      },
       read: function (name, fallback) { var raw = localStorage.getItem('frameshelf-v2:' + name); return raw ? JSON.parse(raw) : fallback; },
       write: function (name, data) { localStorage.setItem('frameshelf-v2:' + name, JSON.stringify(data)); },
       imageUrl: function (file) { return file || ''; },

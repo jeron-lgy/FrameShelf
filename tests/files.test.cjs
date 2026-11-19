@@ -59,3 +59,11 @@ test('Windows ASCII junction renders into Unicode stage and publishes without lo
  const published=store.publish(stage,image,'中文.png','rename');const container=stage.aliasContainer;store.cleanup(stage);
  assert.ok(fs.existsSync(published.path));assert.equal(fs.existsSync(container),false);assert.equal(fs.existsSync(stage.directory),false);
 });
+
+test('Project source enumeration discovers existing sessions and observes deletion without reading project views',t=>{
+ const dir=root(t),s=createStore(dir),C=require('../extension/js/core.js');
+ const session={projectKey:'p',compId:1,records:[{id:'a'}],slots:[]};s.write(C.sessionKey('p',1),session);
+ s.write(C.sessionKey('other',2),{...session,projectKey:'other',compId:2});
+ s.write(C.projectSessionKey('p'),{projectKey:'p',scope:'project',records:[{id:'stale'}]});
+ assert.deepEqual(s.compositionSessions('p'),[session]);session.records=[];s.write(C.sessionKey('p',1),session);assert.deepEqual(s.compositionSessions('p')[0].records,[]);
+});

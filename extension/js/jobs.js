@@ -45,8 +45,10 @@
         var stage = store.stage(directory);
         var output = await hostJob('directPng', { record: record, directory: stage.directory }, [record], record.projectKey);
         await store.waitPreview(stage, output.path);
-        store.verify(output.path, { kind: 'PNG', width: record.width, height: record.height, alpha: true });
-        var published = store.publish(stage, output.path, filename, 'rename');
+        var sourceInfo = store.verify(output.path, { kind: 'PNG', width: record.width, height: record.height, alpha: true });
+        var corrected = await store.straightPng(stage, output.path);
+        store.verify(corrected, { kind: 'PNG', width: record.width, height: record.height, bits: sourceInfo.bits, alpha: true });
+        var published = store.publish(stage, corrected, filename, 'rename');
         try { store.cleanup(stage); } catch (_) { /* Published file must remain available for pasting. */ }
         status('PNG 已保存，正在复制文件…');
         try { await store.copyPngFile(published.path); }
