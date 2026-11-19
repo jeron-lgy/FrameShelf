@@ -402,21 +402,21 @@
             }
             if (S.withStateLock) S.withStateLock(writeField); else writeField();
           });
-          var caption = node('span', field.label); caption.title = field.label;
-          label.append(caption, input); body.append(label);
+          input.setAttribute('aria-label', field.label); input.title = field.label;
+          label.append(input); body.append(label);
         });
       }
       if (photo.lastFile) {
         visual.title = '上次取自：' + (photo.sourceName || owner.compName) + ' · 帧 ' + photo.frame + '\n' + photo.lastFile + '\n' + photo.path;
       }
       if (owner.compId === sourceId) {
-        var remove = button('×', function () {
+        var remove = button('移除卡槽', function () {
           session.slots = session.slots.filter(function (item) { return item.id !== slot.id; });
           persist(); render();
         });
-        remove.className = 'named-remove'; remove.title = '移除占位';
-        remove.setAttribute('aria-label', '移除占位 · ' + title.textContent);
-        heading.append(remove);
+        remove.className = 'named-remove'; remove.title = '移除卡槽';
+        remove.setAttribute('aria-label', '移除卡槽 · ' + title.textContent);
+        body.append(remove);
       }
       grid.append(card);
   }

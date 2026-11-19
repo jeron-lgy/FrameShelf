@@ -90,21 +90,20 @@
 #named-controls{display:flex;align-items:center;gap:8px;margin:14px 0}
 #named-controls select{min-width:0;flex:1}
 #named-controls[hidden]{display:none}
-#named-grid,.named-group-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,218px),1fr));gap:6px}
-.named-card{display:grid;grid-template-columns:58px minmax(0,1fr);align-items:center;gap:8px;min-width:0;padding:6px;background:#1f2226;border:1px solid #35414b;border-radius:5px}
-.named-visual{position:relative;display:grid;place-items:center;height:48px;overflow:hidden;background:#171b1e;border:1px dashed #4c5e69;border-radius:3px;color:#acc2ce;font-size:10px}
+#named-grid,.named-group-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,145px),1fr));gap:6px}
+.named-card{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:4px;min-width:0;padding:6px;background:#1f2226;border:1px solid #35414b;border-radius:5px}
+.named-visual{position:relative;display:grid;place-items:center;height:64px;overflow:hidden;background:#171b1e;border:1px dashed #4c5e69;border-radius:3px;color:#acc2ce;font-size:10px}
 .named-visual img{width:100%;height:100%;min-height:0;object-fit:contain}
 .named-save{position:absolute;inset:0;margin:auto;width:44px;height:26px;padding:0;background:#285f4a;color:white;border:1px solid #64a98a;border-radius:4px;opacity:0;pointer-events:none}
 .named-visual:hover .named-save,.named-save:focus{opacity:1;pointer-events:auto}
 .named-body{min-width:0;display:grid;gap:3px}
 .named-heading{display:flex;align-items:center;gap:3px;min-width:0}
-.named-filename,.named-custom span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.named-filename{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .named-filename{flex:1;font-size:12px}
-.named-remove{flex:none;width:20px;height:20px;padding:0;color:#acbbc5;font-size:15px;opacity:0}
-.named-card:hover .named-remove,.named-card:focus-within .named-remove{opacity:1}
-.named-custom{display:grid;align-items:center;grid-template-columns:minmax(0,auto) minmax(50%,1fr);gap:5px;font-size:10px;color:#a0afba}
+.named-remove{justify-self:end;padding:2px 5px;border:1px solid #414c56;border-radius:3px;background:#282d32;color:#b4c1cb;font-size:10px;line-height:15px}
+.named-custom{display:block;min-width:0}
 .named-custom input{width:100%;min-width:0;box-sizing:border-box;height:23px;padding:2px 5px;font-size:11px}
-@media(hover:none){.named-save{opacity:1;pointer-events:auto}.named-remove{opacity:1}}
+@media(hover:none){.named-save{opacity:1;pointer-events:auto}}
 
 #named-controls{display:block;margin:8px 0 12px}
 #named-controls[hidden]{display:none}
