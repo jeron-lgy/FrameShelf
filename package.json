@@ -1,6 +1,6 @@
 {
   "name": "frame-shelf-ae",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "private": true,
   "description": "AE 2025 composition variants and named still-image batch exports",
   "scripts": {

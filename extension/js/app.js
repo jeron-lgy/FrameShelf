@@ -364,15 +364,17 @@
       if (photo.thumbnail) {
         var img = node('img'); img.src = photo.thumbnail; img.alt = ''; visual.append(img);
       } else visual.append(node('span', '空占位'));
-      var save = button('保存当前帧', function () { return saveNamed(owner, slot, sourceId); });
+      var save = button('保存', function () { return saveNamed(owner, slot, sourceId); });
       save.className = 'named-save';
       var title = node('strong', slotLabel(owner, slot), 'named-filename');
       save.setAttribute('aria-label', '保存当前帧 · ' + title.textContent);
       visual.append(save);
-      card.append(visual, title);
+      var body = node('div', null, 'named-body'), heading = node('div', null, 'named-heading');
+      title.title = title.textContent;
+      heading.append(title); body.append(heading); card.append(visual, body);
       if (!slot.filenameOverride && owner.naming) {
         owner.naming.fields.filter(function (field) { return field.type === 'custom'; }).forEach(function (field) {
-          var label = node('label', field.label, 'named-custom'), input = node('input');
+          var label = node('label', null, 'named-custom'), input = node('input');
           var previous = (slot.values || {})[field.id] || '';
           input.value = previous;
           bindText(input, function () {
@@ -387,7 +389,7 @@
               var value = (current.values || {})[field.id] || '';
               if (value !== previous) {
                 input.value = previous = value;
-                title.textContent = slotLabel(latest, current);
+                title.title = title.textContent = slotLabel(latest, current);
                 throw new Error('此字段刚在另一面板修改，已显示最新值。');
               }
               current.values = current.values || {};
@@ -395,24 +397,27 @@
               S.write(key, latest);
               previous = input.value;
               if (owner.compId === session.compId) { session = latest; namingBase = nameState(latest); }
-              title.textContent = slotLabel(latest, current);
+              title.title = title.textContent = slotLabel(latest, current);
               save.setAttribute('aria-label', '保存当前帧 · ' + title.textContent);
             }
             if (S.withStateLock) S.withStateLock(writeField); else writeField();
           });
-          label.append(input); card.append(label);
+          var caption = node('span', field.label); caption.title = field.label;
+          label.append(caption, input); body.append(label);
         });
       }
-      var actions = node('div', null, 'record-actions');
-      actions.append(button('移除占位', function () {
-        session.slots = session.slots.filter(function (item) { return item.id !== slot.id; });
-        persist(); render();
-      }));
       if (photo.lastFile) {
-        var last = node('small', '上次取自：' + (photo.sourceName || owner.compName) + ' · 帧 ' + photo.frame + ' · ' + photo.lastFile);
-        last.title = photo.path; card.append(last);
+        visual.title = '上次取自：' + (photo.sourceName || owner.compName) + ' · 帧 ' + photo.frame + '\n' + photo.lastFile + '\n' + photo.path;
       }
-      if (owner.compId === sourceId) card.append(actions);
+      if (owner.compId === sourceId) {
+        var remove = button('×', function () {
+          session.slots = session.slots.filter(function (item) { return item.id !== slot.id; });
+          persist(); render();
+        });
+        remove.className = 'named-remove'; remove.title = '移除占位';
+        remove.setAttribute('aria-label', '移除占位 · ' + title.textContent);
+        heading.append(remove);
+      }
       grid.append(card);
   }
   $('named-all').onchange = function () {
