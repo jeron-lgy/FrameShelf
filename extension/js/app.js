@@ -256,11 +256,20 @@
     S.write('photos:' + key, photos);
     return photos;
   }
-  async function saveNamed(owner, slot, sourceId) {
+  async function saveNamed(owner, slot) {
     if (B.demo) throw new Error('请在 AE 中保存当前帧。');
     var record = await B.call('capture');
-    if (owner.projectKey !== record.projectKey || sourceId !== record.compId) {
-      await sync(); throw new Error('当前合成已切换，请在对应占位上重新保存。');
+    var view = managingPins ? 'manage' : pinState.view;
+    var otherProject = owner.projectKey !== record.projectKey;
+    var wrongLocalSlot = view === 'current' && owner.compId !== record.compId;
+    if (S.logDiagnostic) S.logDiagnostic({
+      event:'named-save-source', view:view, displayedCompId:session.compId,
+      capturedCompId:record.compId, ownerCompId:owner.compId, slotId:slot.id,
+      frame:record.displayFrame, otherProject:otherProject, wrongLocalSlot:wrongLocalSlot
+    });
+    if (otherProject || wrongLocalSlot) {
+      await sync();
+      throw new Error(otherProject ? '工程已切换，请选择当前工程的图槽。' : '当前合成已切换，请在新合成的图槽上保存。');
     }
     var ownerKey = C.sessionKey(owner.projectKey, owner.compId);
     var key = 'named:' + ownerKey;
@@ -280,7 +289,7 @@
     S.write(photosKey, photos);
     if (key === namedKey) namedPhotos = photos;
     drawNamed();
-    notice('已保存：' + result.path);
+    notice('已保存：' + result.path + ' · 取自 ' + record.compName + ' · 帧 ' + record.displayFrame);
   }
   function editNamed(slot) {
     var box = node('div'), inputs = [];
@@ -394,7 +403,7 @@
       if (photo.thumbnail) {
         var img = node('img'); img.src = photo.thumbnail; img.alt = ''; visual.append(img);
       } else visual.append(node('span', '空占位'));
-      var save = button('保存', function () { return saveNamed(owner, slot, sourceId); });
+      var save = button('保存', function () { return saveNamed(owner, slot); });
       save.className = 'named-save';
       var title = node('strong', slotLabel(owner, slot), 'named-filename');
       save.setAttribute('aria-label', '保存当前帧 · ' + title.textContent);
