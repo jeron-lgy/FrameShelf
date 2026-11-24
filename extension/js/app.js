@@ -221,7 +221,14 @@
   async function reload() { if (S.jobActive && S.jobActive()) { profiles = S.read('profiles', []); render(); return; } profiles = await B.call('profiles'); S.write('profiles', profiles); render(); }
   async function preview(r) { if (B.demo) { notice('演示模式没有 AE 实际画面。'); return; } if (S.read('recovery:' + r.projectKey, null)) throw new Error('请先处理上次中断任务的恢复记录。');  try { var result = await runner.preview(r); r.previewPath = result.path; r.previewAt = result.at; delete r.previewError; persist(); render(); } catch (e) { r.previewError = e.message; persist(); render(); throw e; } }
   var namedKey, namedPhotos;
-  var allNamedSlots = false, namedProject, expandedGroups = new Map();
+  var namedProject, pinState, managingPins = false;
+  function storePins() { S.write('named-pins:' + namedProject, pinState); }
+  function pinCheck(text, checked, change) {
+    var label = node('label', null, 'pin-choice'), input = node('input');
+    input.type = 'checkbox'; input.checked = checked;
+    input.onchange = function () { change(input.checked); storePins(); drawNamed(); };
+    label.append(input, document.createTextNode(text)); return label;
+  }
   function loadNamedPhotos(key) {
     var photos = S.read('photos:' + key, null);
     if (photos) return photos;
@@ -298,6 +305,7 @@
   }
   function drawNamed() {
     var grid = $('named-grid');
+    var panel = $('named'), scroll = panel.scrollTop;
     grid.replaceChildren();
     var available = session && session.projectKey && session.compId != null;
     $('named-controls').hidden = !available;
@@ -307,16 +315,19 @@
     if (!available) { namedKey = null; return; }
     if (namedProject !== session.projectKey) {
       namedProject = session.projectKey;
-      allNamedSlots = false;
-      expandedGroups.clear();
-      $('named-filter').value = '';
+      pinState = S.read('named-pins:' + namedProject, null) || {view:'current', groups:{}, slots:{}, expanded:{}};
+      managingPins = false; scroll = 0;
+      $('named-filter').value = ''; $('show-default-groups').checked = false;
     }
-    $('named-all').checked = allNamedSlots;
-    $('named-filter').hidden = !allNamedSlots;
-    grid.classList.toggle('named-groups', allNamedSlots);
+    var view = managingPins ? 'manage' : pinState.view;
+    $('named-view').value = pinState.view;
+    $('manage-pins').textContent = managingPins ? '完成固定' : '管理固定';
+    $('default-groups').hidden = !managingPins;
+    $('named-filter').hidden = view === 'current';
+    grid.classList.toggle('named-groups', view !== 'current');
     var key = 'named:' + C.sessionKey(session.projectKey, session.compId);
-    if (key !== namedKey) { expandedGroups.clear(); namedKey = key; namedPhotos = {}; namedPhotos = loadNamedPhotos(key); }
-    if (!allNamedSlots) {
+    if (key !== namedKey) { namedKey = key; namedPhotos = {}; namedPhotos = loadNamedPhotos(key); }
+    if (view === 'current') {
       session.slots.forEach(function (slot) { drawNamedCard(grid, session, slot, namedPhotos, session.compId); });
       return;
     }
@@ -326,18 +337,35 @@
     var sourceId = session.compId;
     var query = $('named-filter').value.trim().toLowerCase();
     var owners = [session].concat(others);
+    if (view === 'pins') owners.sort(function (a,b) { return a.compId-b.compId; });
+    var count = 0;
     owners.forEach(function (owner) {
       var title = owner.compName || ('合成 #' + owner.compId);
       var sameName = owners.some(function (o) { return o !== owner && o.compName === owner.compName; });
       if (sameName) title += ' #' + owner.compId;
+      var whole = !!pinState.groups[owner.compId], individual = pinState.slots[owner.compId] || {};
+      count += owner.slots.filter(function (slot) { return whole || individual[slot.id]; }).length;
+      if (managingPins && !query && !$('show-default-groups').checked && owner.compId !== sourceId && !whole &&
+          !Object.keys(individual).length && owner.presetId === 'starter' && owner.slots.length === 3 &&
+          owner.slots.every(function (slot,i) { return !slot.filenameOverride && slot.pattern === C.defaults().presets[0].slots[i] &&
+            Object.values(slot.values || {}).every(function(v){return !v || slot.pattern.endsWith('_'+v);}); }) &&
+          !(owner.naming && owner.naming.fields.some(function(f){return f.type !== 'custom' && f.value;})) &&
+          !Object.keys(S.read('photos:named:' + C.sessionKey(owner.projectKey,owner.compId), {})).length) return;
       var slots = owner.slots.filter(function (slot) {
+        if (view === 'pins' && !whole && !individual[slot.id]) return false;
         return title.toLowerCase().includes(query) || slotLabel(owner, slot).toLowerCase().includes(query);
       });
       if (!slots.length) return;
       var local = owner.compId === sourceId;
       var group = node('details', null, 'named-group'), cards = node('div', null, 'named-group-cards');
-      group.open = !!query || (expandedGroups.has(owner.compId) ? expandedGroups.get(owner.compId) : local);
+      var expansionKey = view + ':' + owner.compId;
+      group.open = !!query || (expansionKey in pinState.expanded ? pinState.expanded[expansionKey] : (local || view === 'pins'));
       group.append(node('summary', title + (local ? ' · 当前取帧' : '') + ' (' + slots.length + ')'), cards);
+      if (managingPins) {
+        group.insertBefore(pinCheck('固定整组', whole, function (on) {
+          if (on) pinState.groups[owner.compId] = true; else delete pinState.groups[owner.compId];
+        }), cards);
+      }
       function fill() {
         if (!group.open || cards.childElementCount) return;
         var photoKey = 'named:' + C.sessionKey(owner.projectKey, owner.compId);
@@ -346,12 +374,14 @@
       }
       group.ontoggle = function (e) {
         if (!group.isConnected || e.target !== group) return;
-        if (!query) expandedGroups.set(owner.compId, group.open);
+        if (!query && pinState.expanded[expansionKey] !== group.open) { pinState.expanded[expansionKey] = group.open; storePins(); }
         fill();
       };
       grid.append(group); fill();
     });
-    if (!grid.childElementCount) grid.append(node('p', query ? '没有匹配的图槽。' : '当前工程还没有图槽。', 'muted'));
+    $('named-view').options[1].textContent = '已固定（' + count + '）';
+    panel.scrollTop = scroll;
+    if (!grid.childElementCount) grid.append(node('p', view === 'pins' && !count ? '点击「管理固定」，选择常用图槽。' : query ? '没有匹配的图槽。' : '当前工程还没有图槽。', 'muted'));
   }
   function slotLabel(owner, slot) {
     try { return C.slotFilename(owner, slot) + '.png'; } catch (err) { return err.message; }
@@ -421,11 +451,27 @@
         if (lastField.classList.contains('named-custom')) row.append(lastField);
         row.append(remove); body.append(row);
       }
+      if (managingPins) {
+        var whole = !!pinState.groups[owner.compId];
+        var choice = pinCheck(whole ? '随整组固定' : '固定此槽', whole || !!(pinState.slots[owner.compId] || {})[slot.id], function (on) {
+          var slots = pinState.slots[owner.compId] || (pinState.slots[owner.compId] = {});
+          if (on) slots[slot.id] = true; else delete slots[slot.id];
+        });
+        choice.firstChild.disabled = whole;
+        if (whole) choice.firstChild.onchange = function () { this.checked = true; };
+        card.append(choice);
+      }
       grid.append(card);
   }
-  $('named-all').onchange = function () {
-    allNamedSlots = this.checked; expandedGroups.clear(); $('named-filter').value = ''; drawNamed();
+  $('named-view').onchange = function () {
+    managingPins = false; pinState.view = this.value; storePins(); $('named-filter').value = ''; drawNamed();
   };
+  $('manage-pins').onclick = function () {
+    managingPins = !managingPins;
+    if (!managingPins) { pinState.view = 'pins'; storePins(); }
+    $('named-filter').value = ''; drawNamed();
+  };
+  $('show-default-groups').onchange = drawNamed;
   $('named-filter').oninput = drawNamed;
   $('named-add').onclick = guard(function () {
     var slot = {id:C.uid(), pattern:'新名称', values:{}, selected:true, recordId:null};
@@ -433,7 +479,12 @@
     if (custom) slot.values[custom.id] = '新名称';
     session.slots.push(slot);
     $('named-filter').value = '';
-    expandedGroups.set(session.compId, true);
+    pinState.expanded[pinState.view + ':' + session.compId] = true;
+    if (pinState.view === 'pins') {
+      var pinned = pinState.slots[session.compId] || (pinState.slots[session.compId] = {});
+      pinned[slot.id] = true;
+    }
+    storePins();
     persist(); render();
     var card = $('named-grid').querySelector('[data-slot-id="' + slot.id + '"]');
     if (card) setTimeout(function () {

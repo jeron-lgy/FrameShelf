@@ -121,3 +121,5 @@
 .named-group summary{cursor:pointer;padding:9px 0;color:#bbcedb}
 .named-group+.named-group{margin-top:6px;border-top:1px solid #35414b}
 
+
+#named-scope select{width:auto;max-width:55%}#named-scope label[hidden]{display:none}.pin-choice{display:flex;align-items:center;gap:5px;font-size:11px;margin:5px 0}

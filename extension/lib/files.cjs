@@ -160,7 +160,7 @@ function createStore(root) {
       const directory = path.join(root, 'logs');
       fs.mkdirSync(directory, { recursive: true });
       const day = new Date().toISOString().slice(0, 10);
-      const data = Object.assign({ at: new Date().toISOString(), plugin: '0.12.4', node: process.version, platform: process.platform, windows: require('os').release() }, entry);
+      const data = Object.assign({ at: new Date().toISOString(), plugin: '0.13.0', node: process.version, platform: process.platform, windows: require('os').release() }, entry);
       if (entry.directory) data.nodeDirectoryExists = fs.existsSync(entry.directory);
       fs.appendFileSync(path.join(directory, 'render-' + day + '.jsonl'), JSON.stringify(data) + '\n', 'utf8');
     } catch (_) { /* Best-effort diagnostics. */ }

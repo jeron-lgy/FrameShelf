@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.frameshelf.ae" ExtensionBundleVersion="0.12.4" ExtensionBundleName="Frame Shelf">
-  <ExtensionList><Extension Id="com.frameshelf.ae.panel" Version="0.12.4"/><Extension Id="com.frameshelf.ae.exportpanel" Version="0.12.4"/></ExtensionList>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.frameshelf.ae" ExtensionBundleVersion="0.13.0" ExtensionBundleName="Frame Shelf">
+  <ExtensionList><Extension Id="com.frameshelf.ae.panel" Version="0.13.0"/><Extension Id="com.frameshelf.ae.exportpanel" Version="0.13.0"/></ExtensionList>
   <ExecutionEnvironment>
     <HostList><Host Name="AEFT" Version="[25.0,25.9]"/></HostList>
     <LocaleList><Locale Code="All"/></LocaleList>
